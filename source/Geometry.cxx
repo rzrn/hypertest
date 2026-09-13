@@ -253,7 +253,7 @@ void Chunk::emitFaces(NodeRegistry & nodeRegistry) {
 
     faces.clear();
 
-    for (int i = 0; i < chunkSize; i++) for (int j = 0; j <= worldTop; j++) for (int k = 0; k < chunkSize; k++) {
+    for (int j = 0; j <= worldTop; j++) for (int i = 0; i < chunkSize; i++) for (int k = 0; k < chunkSize; k++) {
         auto id = get(i, j, k).id;
 
         if (id == 0) continue;
@@ -274,13 +274,29 @@ void Chunk::emitFaces(NodeRegistry & nodeRegistry) {
     }
 }
 
-inline bool invisible(bool b₀₀, bool b₀₁, bool b₁₀, bool b₁₁)
-{ return (!b₀₀ && !b₀₁ && !b₁₀ && !b₁₁) ||
-          (b₀₀ &&  b₀₁ &&  b₁₀ &&  b₁₁) ||
-         (!b₀₀ && !b₀₁ &&  b₁₀ &&  b₁₁) ||
-          (b₀₀ &&  b₀₁ && !b₁₀ && !b₁₁) ||
-         (!b₀₀ &&  b₀₁ && !b₁₀ &&  b₁₁) ||
-          (b₀₀ && !b₀₁ &&  b₁₀ && !b₁₁); }
+inline bool isEdgeVisible(Node & n₀₀, Node & n₀₁, Node & n₁₀, Node & n₁₁) {
+    bool b₀₀ = n₀₀.id == 0, b₀₁ = n₀₁.id == 0, b₁₀ = n₁₀.id == 0, b₁₁ = n₁₁.id == 0;
+
+    if (b₀₀ && b₀₁ && b₁₀ && b₁₁)
+        return false; // No blocks adjacent to the edge
+
+    if (!b₀₀ && !b₀₁ && !b₁₀ && !b₁₁)
+        return false; // The edge is blocked from all sides
+
+    if (!b₀₀ && !b₀₁ && b₁₀ && b₁₁)
+        return n₀₀.id != n₀₁.id; // The edge is visible iff adjacent blocks have different colors
+
+    if (b₀₀ && b₀₁ && !b₁₀ && !b₁₁)
+        return n₁₀.id != n₁₁.id;
+
+    if (!b₀₀ && b₀₁ && !b₁₀ && b₁₁)
+        return n₀₀.id != n₁₀.id;
+
+    if (b₀₀ && !b₀₁ && b₁₀ && !b₁₁)
+        return n₀₁.id != n₁₁.id;
+
+    return true;
+}
 
 inline void emitLine(EdgeShader::VAO & vao, vec3 && v1, vec3 && v2) {
     vao.push(); vao.emit(v1);
@@ -294,31 +310,35 @@ void Chunk::emitEdges(NodeRegistry &) {
 
     edges.clear();
 
-    for (int i = 0; i <= chunkSize; i++) for (int j = 0; j < worldHeight; j++) for (int k = 0; k <= chunkSize; k++) {
-        bool b₀₀ = (i == 0         || k == 0)         || get(i - 1, j, k - 1).id == 0;
-        bool b₀₁ = (i == 0         || k == chunkSize) || get(i - 1, j, k + 0).id == 0;
-        bool b₁₀ = (i == chunkSize || k == 0)         || get(i + 0, j, k - 1).id == 0;
-        bool b₁₁ = (i == chunkSize || k == chunkSize) || get(i + 0, j, k + 0).id == 0;
+    Node airNode = {.id = 0}; // TODO
 
-        if (!invisible(b₀₀, b₀₁, b₁₀, b₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i][k].v3(j + 1));
-    }
+    for (int j = 0; j < worldHeight; j++) {
+        for (int i = 0; i <= chunkSize; i++) for (int k = 0; k <= chunkSize; k++) {
+            auto n₀₀ = i == 0         || k == 0         ? airNode : get(i - 1, j, k - 1);
+            auto n₀₁ = i == 0         || k == chunkSize ? airNode : get(i - 1, j, k + 0);
+            auto n₁₀ = i == chunkSize || k == 0         ? airNode : get(i + 0, j, k - 1);
+            auto n₁₁ = i == chunkSize || k == chunkSize ? airNode : get(i + 0, j, k + 0);
 
-    for (int i = 0; i < chunkSize; i++) for (int j = 0; j <= worldHeight; j++) for (int k = 0; k <= chunkSize; k++) {
-        bool b₀₀ = (j == 0           || k == 0)         || get(i, j - 1, k - 1).id == 0;
-        bool b₀₁ = (j == 0           || k == chunkSize) || get(i, j - 1, k + 0).id == 0;
-        bool b₁₀ = (j == worldHeight || k == 0)         || get(i, j + 0, k - 1).id == 0;
-        bool b₁₁ = (j == worldHeight || k == chunkSize) || get(i, j + 0, k + 0).id == 0;
+            if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i][k].v3(j + 1));
+        }
 
-        if (!invisible(b₀₀, b₀₁, b₁₀, b₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i + 1][k].v3(j));
-    }
+        for (int i = 0; i < chunkSize; i++) for (int k = 0; k <= chunkSize; k++) {
+            auto n₀₀ = j == 0           || k == 0         ? airNode : get(i, j - 1, k - 1);
+            auto n₀₁ = j == 0           || k == chunkSize ? airNode : get(i, j - 1, k + 0);
+            auto n₁₀ = j == worldHeight || k == 0         ? airNode : get(i, j + 0, k - 1);
+            auto n₁₁ = j == worldHeight || k == chunkSize ? airNode : get(i, j + 0, k + 0);
 
-    for (int i = 0; i <= chunkSize; i++) for (int j = 0; j <= worldHeight; j++) for (int k = 0; k < chunkSize; k++) {
-        bool b₀₀ = (j == 0           || i == 0)         || get(i - 1, j - 1, k).id == 0;
-        bool b₀₁ = (j == 0           || i == chunkSize) || get(i + 0, j - 1, k).id == 0;
-        bool b₁₀ = (j == worldHeight || i == 0)         || get(i - 1, j + 0, k).id == 0;
-        bool b₁₁ = (j == worldHeight || i == chunkSize) || get(i + 0, j + 0, k).id == 0;
+            if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i + 1][k].v3(j));
+        }
 
-        if (!invisible(b₀₀, b₀₁, b₁₀, b₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i][k + 1].v3(j));
+        for (int i = 0; i <= chunkSize; i++) for (int k = 0; k < chunkSize; k++) {
+            auto n₀₀ = i == 0         || j == 0           ? airNode : get(i - 1, j - 1, k);
+            auto n₀₁ = i == 0         || j == worldHeight ? airNode : get(i - 1, j + 0, k);
+            auto n₁₀ = i == chunkSize || j == 0           ? airNode : get(i + 0, j - 1, k);
+            auto n₁₁ = i == chunkSize || j == worldHeight ? airNode : get(i + 0, j + 0, k);
+
+            if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i][k + 1].v3(j));
+        }
     }
 }
 
