@@ -23,7 +23,8 @@ else
 	endif
 
 	ifeq ($(UNAME),FreeBSD)
-		override LDFLAGS += -lsqlite3 -lgmpxx -lgmp -lluajit-5.1 -lglfw -lGLEW -lGL -lGLU
+		override CFLAGS  += -I/usr/local/include
+		override LDFLAGS += -pthread -L/usr/local/lib -lsqlite3 -lgmpxx -lgmp -lluajit-5.1 -lglfw -lGLEW -lGL -lGLU
 	endif
 
 	ifeq ($(UNAME),Darwin)
