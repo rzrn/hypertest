@@ -242,9 +242,6 @@ public:
         inline void draw(const GLenum type, GLsizei i1, GLsizei i2)
         { bindVAO(); glDrawElements(type, i2 - i1, indexType, reinterpret_cast<void *>(i1 * sizeof(Index))); }
 
-        inline void drawInstanced(const GLenum type, GLsizei ninstance)
-        { bindVAO(); glDrawElementsInstanced(type, count, indexType, nullptr, ninstance); }
-
         inline Index index() const { return vertices.size(); }
         inline GLsizei eboElementCount() const { return indices.size(); }
 
