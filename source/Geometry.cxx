@@ -352,6 +352,10 @@ void Chunk::emitEdges(NodeRegistry &) {
 
 void Chunk::refresh(NodeRegistry & nodeRegistry) {
     if (needUpdateVAO) {
+        facesOffsetY.flip();
+        edgesLowerOffsetY.flip();
+        edgesUpperOffsetY.flip();
+
         faces.upload(GL_DYNAMIC_DRAW);
         edges.upload(GL_DYNAMIC_DRAW);
 
@@ -418,19 +422,19 @@ void Chunk::renderEdges(EdgeShader * shader, int Y₁, int Y₂) {
 
     if (Y₁ < 0) {
         shader->uniform<float>("cameraTileY", -worldHeight);
-        edges.draw(GL_LINES, edgesLowerOffsetY[Y₁ + worldHeight], edgesUpperOffsetY[worldTop]);
+        edges.draw(GL_LINES, edgesLowerOffsetY(Y₁ + worldHeight), edgesUpperOffsetY(worldTop));
 
         shader->uniform<float>("cameraTileY", 0);
-        edges.draw(GL_LINES, 0, edgesUpperOffsetY[Y₂]);
+        edges.draw(GL_LINES, 0, edgesUpperOffsetY(Y₂));
     } else if (worldHeight <= Y₂) {
         shader->uniform<float>("cameraTileY", 0);
-        edges.draw(GL_LINES, edgesLowerOffsetY[Y₁], edgesUpperOffsetY[worldTop]);
+        edges.draw(GL_LINES, edgesLowerOffsetY(Y₁), edgesUpperOffsetY(worldTop));
 
         shader->uniform<float>("cameraTileY", worldHeight);
-        edges.draw(GL_LINES, 0, edgesUpperOffsetY[Y₂ - worldHeight]);
+        edges.draw(GL_LINES, 0, edgesUpperOffsetY(Y₂ - worldHeight));
     } else {
         shader->uniform<float>("cameraTileY", 0);
-        edges.draw(GL_LINES, edgesLowerOffsetY[Y₁], edgesUpperOffsetY[Y₂]);
+        edges.draw(GL_LINES, edgesLowerOffsetY(Y₁), edgesUpperOffsetY(Y₂));
     }
 }
 

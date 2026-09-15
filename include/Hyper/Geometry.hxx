@@ -17,6 +17,7 @@
 #include <Math/Fuchsian.hxx>
 #include <Math/AutD.hxx>
 
+#include <Meta/DoubleBuffer.hxx>
 #include <Meta/List.hxx>
 
 using ℤi = Gaussian<Integer>;
@@ -114,15 +115,13 @@ private:
     bool _working = false; std::future<void> worker;
     FaceShader::VAO faces; EdgeShader::VAO edges;
 
-    GLsizei facesOffsetY[Fundamentals::worldHeight];
-    GLsizei edgesLowerOffsetY[Fundamentals::worldHeight];
-    GLsizei edgesUpperOffsetY[Fundamentals::worldHeight];
+    DoubleBuffer<GLsizei, Fundamentals::worldHeight> facesOffsetY, edgesLowerOffsetY, edgesUpperOffsetY;
 
     inline GLsizei facesLowerOffsetY(const Level H) const
-    { return H > 0 ? facesOffsetY[H - 1] : 0; }
+    { return H > 0 ? facesOffsetY(H - 1) : 0; }
 
     inline GLsizei facesUpperOffsetY(const Level H) const
-    { return facesOffsetY[H]; }
+    { return facesOffsetY(H); }
 
     bool _ready = false, _dirty = false, _needRefresh = false, _needUnload = false, needUpdateVAO = false;
 
