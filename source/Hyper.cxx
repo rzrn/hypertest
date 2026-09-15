@@ -644,16 +644,22 @@ Chunk * buildFloor(Chunk * chunk) {
         for (size_t j = 0; j < chunkSize; j++)
             chunk->set(i, 0, j, {1});*/
 
-    for (size_t i = 0; i < chunkSize; i++) {
-        chunk->set(i, 0, 6, {1});
-        chunk->set(i, 0, 7, {1});
-        chunk->set(i, 0, 8, {1});
-        chunk->set(i, 0, 9, {1});
+    Node node = {1};
 
-        chunk->set(6, 0, i, {1});
-        chunk->set(7, 0, i, {1});
-        chunk->set(8, 0, i, {1});
-        chunk->set(9, 0, i, {1});
+    for (int k = 0; k <= worldTop; k += 16) {
+        for (int i = 0; i < chunkSize; i++) for (int j = 0; j < chunkSize; j++) {
+            int H = abs(j - chunkSize / 2) < 4 ? i : 0;
+
+            chunk->set(i, k + H,     j, node);
+            chunk->set(i, k + H + 1, j, node);
+        }
+    }
+
+    for (int k = 0; k <= worldTop; k++) {
+        chunk->set(0,             k, 0,             node);
+        chunk->set(0,             k, chunkSize - 1, node);
+        chunk->set(chunkSize - 1, k, 0,             node);
+        chunk->set(chunkSize - 1, k, chunkSize - 1, node);
     }
 
     return chunk;
@@ -673,7 +679,7 @@ void setupGame(Config & config) {
     for (std::size_t k = 0; k < Tesselation::neighbours.size(); k++)
         atlas.poll(Tesselation::I, Tesselation::neighbours[k]);
 
-    player.teleport(Position(), 5);
+    player.teleport(Position(), 4);
 }
 
 void cleanUp(GLFWwindow * window) {
