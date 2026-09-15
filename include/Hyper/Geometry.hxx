@@ -50,7 +50,8 @@ namespace Tesselation {
     template<typename T, typename Us> constexpr inline std::array<T, Length<Us>> eval()
     { std::array<T, Length<Us>> retval; Eval<T, Us>::insert(0, retval); return retval; }
 
-    using Grid = Array²<Gyrovector<Real>, chunkSize + 1>;
+    // `... + 1` is added because there are N + 1 vertices for N intervals
+    using Grid = Array²<Gyrovector<Real>, sizeTileX + 1, sizeTileZ + 1>;
 
     using Neighbours = List<
         Compose<Up>, Compose<Left>, Compose<Down>, Compose<Right>,
@@ -100,7 +101,7 @@ public:
 };
 
 struct Blob {
-    Node data[Fundamentals::chunkSize][Fundamentals::worldHeight][Fundamentals::chunkSize];
+    Node data[Fundamentals::sizeTileX][Fundamentals::sizeTileY][Fundamentals::sizeTileZ];
 
     Blob() : data{} {}
 } __attribute__((packed));
@@ -115,13 +116,10 @@ private:
     bool _working = false; std::future<void> worker;
     FaceShader::VAO faces; EdgeShader::VAO edges;
 
-    DoubleBuffer<GLsizei, Fundamentals::worldHeight> facesOffsetY, edgesLowerOffsetY, edgesUpperOffsetY;
+    DoubleBuffer<GLsizei, Fundamentals::sizeTileY> facesOffsetY, edgesLowerOffsetY, edgesUpperOffsetY;
 
-    inline GLsizei facesLowerOffsetY(const Level H) const
-    { return H > 0 ? facesOffsetY(H - 1) : 0; }
-
-    inline GLsizei facesUpperOffsetY(const Level H) const
-    { return facesOffsetY(H); }
+    inline GLsizei facesLowerOffsetY(const int Y) const { return Y > 0 ? facesOffsetY(Y - 1) : 0; }
+    inline GLsizei facesUpperOffsetY(const int Y) const { return facesOffsetY(Y);                 }
 
     bool _ready = false, _dirty = false, _needRefresh = false, _needUnload = false, needUpdateVAO = false;
 
@@ -141,7 +139,7 @@ public:
     void updateMatrix(const Fuchsian<Integer> &);
     void refresh(NodeRegistry &);
 
-    bool walkable(Rank, Real, Rank);
+    bool walkable(int, Real, int);
 
     void serialize(sqlite3_stmt *, int, int, int, int, int);
     void load(ChunkOperator *, sqlite3 *);
@@ -167,20 +165,20 @@ public:
     inline Blob * blob() { if (_blob != nullptr) _dirty = true; return _blob; }
     inline const Blob * blob() const { return _blob; }
 
-    inline auto get(Rank i, Level j, Rank k) const
-    { return _blob->data[i][j][k]; }
+    inline auto get(int X, int Y, int Z) const
+    { return _blob->data[X][Y][Z]; }
 
-    inline void set(size_t i, size_t j, size_t k, const Node & node)
-    { _dirty = true; _blob->data[i][j][k] = node; }
+    inline void set(int X, int Y, int Z, const Node & node)
+    { _dirty = true; _blob->data[X][Y][Z] = node; }
 
-    static bool touch(const Gyrovector<Real> &, Rank, Rank);
-    static std::pair<Rank, Rank> round(const Gyrovector<Real> &);
+    static bool touch(const Gyrovector<Real> &, int, int);
+    static std::pair<int, int> round(const Gyrovector<Real> &);
 
     static bool isInsideOfDomain(const Gyrovector<Real> &);
     static std::optional<size_t> matchNeighbour(const Gyrovector<Real> &);
 
     static inline Real clamp(Real x)
-    { return Math::remainder<Real>(x, Fundamentals::worldHeight); }
+    { return Math::remainder<Real>(x, Fundamentals::sizeTileY); }
 };
 
 class Atlas {

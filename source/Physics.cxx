@@ -18,7 +18,7 @@ std::pair<Position, bool> Position::move(const Gyrovector<Real> & v) const {
     return std::pair(*this, false);
 }
 
-std::pair<Rank, Rank> Position::round(const Chunk * C) const {
+std::pair<int, int> Position::round(const Chunk * C) const {
     auto Q = (C->isometry().inverse() * _action).field<Real>() * Möbius<Real>(_domain);
     return Chunk::round(Q.origin());
 }
@@ -47,15 +47,15 @@ vec3 Object::right() const {
     );
 }
 
-bool Entity::stuck(Chunk * C, Rank x, Real y, Rank z) {
+bool Entity::stuck(Chunk * C, int X, Real y, int Z) {
     if (flymode && noclip) return false;
 
     if (C == nullptr || !C->ready()) return false;
 
-    auto y₁ = std::floor(y), y₂ = std::floor(y + height);
+    auto Y₁ = std::floor(y), Y₂ = std::floor(y + height);
 
-    for (int L = y₁; L <= y₂; L++)
-        if (!C->walkable(x, L, z))
+    for (int Y = Y₁; Y <= Y₂; Y++)
+        if (!C->walkable(X, Y, Z))
             return true;
 
     return false;

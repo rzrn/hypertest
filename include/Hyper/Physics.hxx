@@ -35,7 +35,7 @@ public:
     //  not only over neighbours, but it seems useless.)
     std::pair<Position, bool> move(const Gyrovector<Real> &) const;
 
-    std::pair<Rank, Rank> round(const Chunk *) const;
+    std::pair<int, int> round(const Chunk *) const;
 };
 
 struct Object {
@@ -54,7 +54,7 @@ struct Object {
 
 class Entity {
 private:
-    Rank _i, _j; Object _camera; Atlas * _atlas; Chunk * _chunk;
+    int _i, _j; Object _camera; Atlas * _atlas; Chunk * _chunk;
 
     bool jumped = false;
 
@@ -69,7 +69,7 @@ public:
     Entity(Atlas * atlas) : _i(0), _j(0), _atlas(atlas), _chunk(nullptr) {}
 
     bool stuck();
-    bool stuck(Chunk *, Rank, Real, Rank);
+    bool stuck(Chunk *, int, Real, int);
 
     // Returns true iff chunk changes
     bool move(const Gyrovector<Real> & v, Real dt);

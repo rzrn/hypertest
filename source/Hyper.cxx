@@ -69,19 +69,19 @@ vec3 unproject(const glm::mat4 & view, const glm::mat4 & projection, const GLflo
     return vec3(v.x / v.w, v.y / v.w, v.z / v.w);
 }
 
-vec3 trace(const glm::mat4 & view, const glm::mat4 & projection, const GLfloat zbuffer, const GLfloat H, bool forward) {
+vec3 trace(const glm::mat4 & view, const glm::mat4 & projection, const GLfloat zbuffer, const GLfloat y, bool forward) {
     using namespace Game;
     using namespace Render;
 
-    auto h = vec3(0.0f, H, 0.0f);
+    auto v₀ = vec3(0.0f, y, 0.0f);
 
-    auto w₀ = standard->model.unapply(unproject(view, projection, 2.0f * zbuffer - 1.0f));
-    auto dist₀ = glm::length(w₀ - h);
+    auto v = standard->model.unapply(unproject(view, projection, 2.0f * zbuffer - 1.0f));
+    auto dist₀ = glm::length(v - v₀);
 
     const GLfloat ε = standard->meter / 3.0f;
     GLfloat dist = dist₀ + (forward ? +ε : -ε);
 
-    return (dist / dist₀) * (w₀ - h) + h;
+    return (dist / dist₀) * (v - v₀) + v₀;
 }
 
 std::optional<std::pair<Chunk *, Gyrovector<Real>>> getNeighbour(const Gyrovector<Real> & P) {
@@ -103,34 +103,34 @@ std::optional<std::pair<Chunk *, Gyrovector<Real>>> getNeighbour(const Gyrovecto
     return std::nullopt;
 }
 
-void setBlock(Chunk * C, Rank i, Real L, Rank k, NodeId id) {
+void setBlock(Chunk * C, int X, Real y, int Z, NodeId id) {
     if (C == nullptr || !C->ready())
         return;
 
-    if (i >= Fundamentals::chunkSize || k >= Fundamentals::chunkSize)
+    if (Fundamentals::maxTileX < X || Fundamentals::maxTileZ < Z)
         return;
 
-    auto j = Level(std::floor(Chunk::clamp(L)));
+    int Y = std::floor(Chunk::clamp(y));
 
-    if (id != 0 && C->get(i, j, k).id != 0)
+    if (id != 0 && C->get(X, Y, Z).id != 0)
         return;
 
-    C->set(i, j, k, {id});
+    C->set(X, Y, Z, {id});
 
     if (Game::player.stuck())
-        C->set(i, j, k, {0});
+        C->set(X, Y, Z, {0});
 
     C->requestRefresh();
 }
 
 void click(const Aut𝔻<Real> & origin, const GLfloat zbuffer, const Action action) {
     const auto maxₕ = 5.0 * Tesselation::meter, maxᵥ = 4.0;
-    const auto H = Game::player.camera().climb + Game::player.eye;
+    const auto y₀ = Game::player.camera().climb + Game::player.eye;
 
-    auto v = trace(view, projection, zbuffer, H, action == Action::Remove);
+    auto v = trace(view, projection, zbuffer, y₀, action == Action::Remove);
     auto P = Gyrovector(v.x, v.z);
 
-    if (P.abs() <= maxₕ && fabs(v.y - H) <= maxᵥ) {
+    if (P.abs() <= maxₕ && fabs(v.y - y₀) <= maxᵥ) {
         if (auto ret = getNeighbour(origin.inverse().apply(P))) {
             auto [C, Q] = *ret; auto [i, k] = Chunk::round(Q);
 
@@ -368,10 +368,12 @@ void rotateBlob() {
 
     auto buf = new Blob; memcpy(buf, src, sizeof(Blob));
 
-    for (size_t i = 0; i < chunkSize; i++)
-        for (size_t j = 0; j < worldHeight; j++)
-            for (size_t k = 0; k < chunkSize; k++)
-                src->data[i][j][k] = buf->data[k][j][chunkSize - 1 - i];
+    static_assert(sizeTileX == sizeTileZ);
+
+    for (int X = 0; X < sizeTileX; X++)
+        for (int Y = 0; Y < sizeTileY; Y++)
+            for (int Z = 0; Z < sizeTileZ; Z++)
+                src->data[X][Y][Z] = buf->data[Z][Y][maxTileX - X];
 
     delete buf;
 
@@ -640,26 +642,26 @@ void setupGL(GLFWwindow * window, Config & config) {
 Chunk * buildFloor(Chunk * chunk) {
     using namespace Fundamentals;
 
-    /*for (size_t i = 0; i < chunkSize; i++)
-        for (size_t j = 0; j < chunkSize; j++)
-            chunk->set(i, 0, j, {1});*/
+    /*for (int X = 0; X < sizeTileX; X++)
+        for (int Z = 0; Z < sizeTileZ; Z++)
+            chunk->set(X, 0, Z, {1});*/
 
     Node node = {1};
 
-    for (int k = 0; k <= worldTop; k += 16) {
-        for (int i = 0; i < chunkSize; i++) for (int j = 0; j < chunkSize; j++) {
-            int H = abs(j - chunkSize / 2) < 4 ? i : 0;
+    for (int Y = 0; Y < sizeTileY; Y += 16) {
+        for (int X = 0; X < sizeTileX; X++) for (int Z = 0; Z < sizeTileZ; Z++) {
+            int H = abs(Z - sizeTileZ / 2) < 4 ? X : 0;
 
-            chunk->set(i, k + H,     j, node);
-            chunk->set(i, k + H + 1, j, node);
+            chunk->set(X, Y + H, Z, node);
+            if (Y + H < maxTileY) chunk->set(X, Y + H + 1, Z, node);
         }
     }
 
-    for (int k = 0; k <= worldTop; k++) {
-        chunk->set(0,             k, 0,             node);
-        chunk->set(0,             k, chunkSize - 1, node);
-        chunk->set(chunkSize - 1, k, 0,             node);
-        chunk->set(chunkSize - 1, k, chunkSize - 1, node);
+    for (int Y = 0; Y <= sizeTileY; Y++) {
+        chunk->set(0,        Y, 0,        node);
+        chunk->set(0,        Y, maxTileZ, node);
+        chunk->set(maxTileX, Y, 0,        node);
+        chunk->set(maxTileX, Y, maxTileZ, node);
     }
 
     return chunk;

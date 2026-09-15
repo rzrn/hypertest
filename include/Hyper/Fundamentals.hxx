@@ -19,11 +19,8 @@ using Real³ = std::tuple<Real, Real, Real>;
 using Integer = mpz_class;
 using NodeId  = uint16_t;
 
-using Rank  = uint8_t;
-using Level = uint8_t;
-
 // Some helpful definitions
-template<typename T, int N> using Array² = std::array<std::array<T, N>, N>;
+template<typename T, int N, int M> using Array² = std::array<std::array<T, M>, N>;
 
 // Various machinery for projections
 enum {
@@ -136,12 +133,13 @@ struct Model {
 };
 
 namespace Fundamentals {
-    constexpr Level worldTop = 255;
+    constexpr int sizeTileX = 16;
+    constexpr int sizeTileY = 256;
+    constexpr int sizeTileZ = 16;
 
-    constexpr Rank exterior = 255;
-
-    constexpr int chunkSize   = 16;
-    constexpr int worldHeight = worldTop + 1;
+    constexpr int maxTileX = sizeTileX - 1;
+    constexpr int maxTileY = sizeTileY - 1;
+    constexpr int maxTileZ = sizeTileZ - 1;
 
     // https://www.researchgate.net/publication/299161235_THE_HYPERBOLIC_SSQUARE_AND_MOBIUS_TRANSFORMATIONS
     // https://link.springer.com/book/10.1007/978-3-031-02396-5, “A Gyrovector Space Approach to Hyperbolic Geometry”

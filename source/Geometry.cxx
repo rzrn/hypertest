@@ -93,49 +93,49 @@ namespace Tesselation {
         return std::pair(std::atanh(k₁) / hd₁, std::atanh(k₂) / hd₂);
     }
 
-    constexpr auto apply(int i, int j) {
+    constexpr auto apply(int X, int Z) {
         using namespace Fundamentals;
 
-        auto x = 2 * Real(i) / chunkSize - 1;
-        auto y = 2 * Real(j) / chunkSize - 1;
-        return Ψ(x, y);
+        auto t₁ = 2 * Real(X) / sizeTileX - 1;
+        auto t₂ = 2 * Real(Z) / sizeTileZ - 1;
+        return Ψ(t₁, t₂);
     }
 
     auto unapply(Real u, Real v) {
-        auto [x, y] = Ψ⁻¹(u, v);
+        auto [t₁, t₂] = Ψ⁻¹(u, v);
 
         /* Chunk’s border is not exactly a hyperbolic line (i.e. circular arc on the Poincaré disk),
            but its piecewise linear approximation; so there are parts of the outer blocks that extend
            slightly beyond the boundary of the ideal hyperbolic square.
            That’s why we need to “std::clamp” here.
         */
-        x = std::clamp<Real>(x, -1.0, 0.9999); // x ≤ 0.9999 < 1 so that Rank(i) < chunkSize
-        y = std::clamp<Real>(y, -1.0, 0.9999);
+        t₁ = std::clamp<Real>(t₁, -1.0, 0.9999); // t₁ ≤ 0.9999 < 1 so that int(X) < sizeTileX
+        t₂ = std::clamp<Real>(t₂, -1.0, 0.9999);
 
-        auto i = (x + 1) / 2 * chunkSize;
-        auto j = (y + 1) / 2 * chunkSize;
+        auto X = (t₁ + 1) / 2 * sizeTileX;
+        auto Z = (t₂ + 1) / 2 * sizeTileZ;
 
-        return std::pair(Rank(i), Rank(j));
+        return std::pair(int(X), int(Z));
     }
 
     constexpr auto init() {
         using namespace Fundamentals;
 
-        Array²<Gyrovector<Real>, chunkSize + 1> retval;
+        Array²<Gyrovector<Real>, sizeTileX + 1, sizeTileZ + 1> retval;
 
-        for (int i = 0; i <= chunkSize; i++)
-            for (int j = 0; j <= chunkSize; j++)
-                retval[i][j] = apply(i, j);
+        for (int X = 0; X <= sizeTileX; X++)
+            for (int Z = 0; Z <= sizeTileZ; Z++)
+                retval[X][Z] = apply(X, Z);
 
         return retval;
     }
 
     constexpr Grid corners = init();
 
-    constexpr auto distance(Rank i₁, Rank j₁, Rank i₂, Rank j₂)
-    { return (-corners[i₁][j₁] + corners[i₂][j₂]).abs(); }
+    constexpr auto distance(int X₁, int Z₁, int X₂, int Z₂)
+    { return (-corners[X₁][Z₁] + corners[X₂][Z₂]).abs(); }
 
-    constexpr Real meter = distance(chunkSize / 2, chunkSize / 2, chunkSize / 2, chunkSize / 2 + 1);
+    constexpr Real meter = distance(sizeTileX / 2, sizeTileZ / 2, sizeTileX / 2, sizeTileZ / 2 + 1);
 }
 
 NodeRegistry::NodeRegistry() {
@@ -191,11 +191,11 @@ Chunk::Chunk(const Fuchsian<Integer> & origin, const Fuchsian<Integer> & isometr
 
 Chunk::~Chunk() { join(); delete _blob; faces.free(); edges.free(); }
 
-bool Chunk::walkable(Rank x, Real L, Rank z) {
+bool Chunk::walkable(int X, Real y, int Z) {
     using namespace Fundamentals;
 
-    if (chunkSize <= x || chunkSize <= z) return true;
-    return get(x, Level(Chunk::clamp(L)), z).id == 0;
+    if (sizeTileX <= X || sizeTileZ <= Z) return true;
+    return get(X, int(Chunk::clamp(y)), Z).id == 0;
 }
 
 void drawParallelogram(FaceShader::VAO & vao, Texture & T, const Parallelogram<GLfloat> & P, GLfloat h) {
@@ -236,48 +236,48 @@ void drawRightParallelogrammicPrism(FaceShader::VAO & vao, Cube & C, Mask m, GLf
     if (m.left)  drawSide(vao, C.left,  P.A, P.D, h₁, h₂);
 }
 
-template<typename T> inline Parallelogram<T> parallelogram(Rank i, Rank j) {
+template<typename T> inline Parallelogram<T> parallelogram(int X, int Z) {
     using namespace Tesselation;
 
     return {
-        corners[i + 0][j + 0], corners[i + 1][j + 0],
-        corners[i + 1][j + 1], corners[i + 0][j + 1]
+        corners[X + 0][Z + 0], corners[X + 1][Z + 0],
+        corners[X + 1][Z + 1], corners[X + 0][Z + 1]
     };
 }
 
-void drawNode(FaceShader::VAO & vao, Cube & C, Mask m, Rank x, Level y, Rank z)
-{ drawRightParallelogrammicPrism(vao, C, m, GLfloat(y), 1.0f, parallelogram<GLfloat>(x, z)); }
+void drawNode(FaceShader::VAO & vao, Cube & C, Mask m, int X, int Y, int Z)
+{ drawRightParallelogrammicPrism(vao, C, m, GLfloat(Y), 1.0f, parallelogram<GLfloat>(X, Z)); }
 
 void Chunk::emitFaces(NodeRegistry & nodeRegistry) {
     using namespace Fundamentals;
 
     faces.clear();
 
-    for (int j = 0; j <= worldTop; j++) {
-        for (int i = 0; i < chunkSize; i++) for (int k = 0; k < chunkSize; k++) {
-            auto id = get(i, j, k).id;
+    for (int Y = 0; Y < sizeTileY; Y++) {
+        for (int X = 0; X < sizeTileX; X++) for (int Z = 0; Z < sizeTileZ; Z++) {
+            auto id = get(X, Y, Z).id;
 
             if (id == 0) continue;
 
             Mask mask;
 
-            Node n₁ = j == worldTop ? get(i, 0,        k) : get(i, j + 1, k);
-            Node n₂ = j == 0        ? get(i, worldTop, k) : get(i, j - 1, k);
+            Node n₁ = Y == maxTileY ? get(X, 0,        Z) : get(X, Y + 1, Z);
+            Node n₂ = Y == 0        ? get(X, maxTileY, Z) : get(X, Y - 1, Z);
 
             mask.top    = (n₁.id == 0);
             mask.bottom = (n₂.id == 0);
-            mask.back   = (k == 0)             || (get(i + 0, j + 0, k - 1).id == 0);
-            mask.front  = (k == chunkSize - 1) || (get(i + 0, j + 0, k + 1).id == 0);
-            mask.left   = (i == 0)             || (get(i - 1, j + 0, k + 0).id == 0);
-            mask.right  = (i == chunkSize - 1) || (get(i + 1, j + 0, k + 0).id == 0);
+            mask.back   = (Z == 0)        || (get(X + 0, Y, Z - 1).id == 0);
+            mask.front  = (Z == maxTileZ) || (get(X + 0, Y, Z + 1).id == 0);
+            mask.left   = (X == 0)        || (get(X - 1, Y, Z + 0).id == 0);
+            mask.right  = (X == maxTileX) || (get(X + 1, Y, Z + 0).id == 0);
 
             if (nodeRegistry.has(id)) {
                 auto nodeDef = nodeRegistry.get(id);
-                drawNode(faces, nodeDef.cube, mask, i, j, k);
+                drawNode(faces, nodeDef.cube, mask, X, Y, Z);
             }
         }
 
-        facesOffsetY[j] = faces.eboElementCount();
+        facesOffsetY[Y] = faces.eboElementCount();
     }
 }
 
@@ -319,38 +319,38 @@ void Chunk::emitEdges(NodeRegistry &) {
 
     Node airNode = {.id = 0}; // TODO
 
-    for (int j = 0; j <= worldHeight; j++) {
-        if (j < worldHeight) edgesLowerOffsetY[j] = edges.eboElementCount();
+    for (int Y = 0; Y <= sizeTileY; Y++) {
+        if (Y < sizeTileY) edgesLowerOffsetY[Y] = edges.eboElementCount();
 
         // TODO: maybe it would be better for `get(...)` to wrap its arguments?
 
-        for (int i = 0; i < chunkSize; i++) for (int k = 0; k <= chunkSize; k++) {
-            auto n₀₀ = k == 0         ? airNode : j == 0           ? get(i, worldTop, k - 1) : get(i, j - 1, k - 1);
-            auto n₀₁ = k == chunkSize ? airNode : j == 0           ? get(i, worldTop, k + 0) : get(i, j - 1, k + 0);
-            auto n₁₀ = k == 0         ? airNode : j == worldHeight ? get(i, 0,        k - 1) : get(i, j + 0, k - 1);
-            auto n₁₁ = k == chunkSize ? airNode : j == worldHeight ? get(i, 0,        k + 0) : get(i, j + 0, k + 0);
+        for (int X = 0; X < sizeTileX; X++) for (int Z = 0; Z <= sizeTileZ; Z++) {
+            auto n₀₀ = Z == 0         ? airNode : Y == 0         ? get(X, maxTileY, Z - 1) : get(X, Y - 1, Z - 1);
+            auto n₀₁ = Z == sizeTileZ ? airNode : Y == 0         ? get(X, maxTileY, Z + 0) : get(X, Y - 1, Z + 0);
+            auto n₁₀ = Z == 0         ? airNode : Y == sizeTileY ? get(X, 0,        Z - 1) : get(X, Y + 0, Z - 1);
+            auto n₁₁ = Z == sizeTileZ ? airNode : Y == sizeTileY ? get(X, 0,        Z + 0) : get(X, Y + 0, Z + 0);
 
-            if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i + 1][k].v3(j));
+            if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[X][Z].v3(Y), corners[X + 1][Z].v3(Y));
         }
 
-        for (int i = 0; i <= chunkSize; i++) for (int k = 0; k < chunkSize; k++) {
-            auto n₀₀ = i == 0         ? airNode : j == 0           ? get(i - 1, worldTop, k) : get(i - 1, j - 1, k);
-            auto n₀₁ = i == 0         ? airNode : j == worldHeight ? get(i - 1, 0,        k) : get(i - 1, j + 0, k);
-            auto n₁₀ = i == chunkSize ? airNode : j == 0           ? get(i + 0, worldTop, k) : get(i + 0, j - 1, k);
-            auto n₁₁ = i == chunkSize ? airNode : j == worldHeight ? get(i + 0, 0,        k) : get(i + 0, j + 0, k);
+        for (int X = 0; X <= sizeTileX; X++) for (int Z = 0; Z < sizeTileZ; Z++) {
+            auto n₀₀ = X == 0         ? airNode : Y == 0         ? get(X - 1, maxTileY, Z) : get(X - 1, Y - 1, Z);
+            auto n₀₁ = X == 0         ? airNode : Y == sizeTileY ? get(X - 1, 0,        Z) : get(X - 1, Y + 0, Z);
+            auto n₁₀ = X == sizeTileX ? airNode : Y == 0         ? get(X + 0, maxTileY, Z) : get(X + 0, Y - 1, Z);
+            auto n₁₁ = X == sizeTileX ? airNode : Y == sizeTileY ? get(X + 0, 0,        Z) : get(X + 0, Y + 0, Z);
 
-            if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i][k + 1].v3(j));
+            if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[X][Z].v3(Y), corners[X][Z + 1].v3(Y));
         }
 
-        if (j > 0) edgesUpperOffsetY[j - 1] = edges.eboElementCount();
+        if (Y > 0) edgesUpperOffsetY[Y - 1] = edges.eboElementCount();
 
-        if (j < worldHeight) for (int i = 0; i <= chunkSize; i++) for (int k = 0; k <= chunkSize; k++) {
-            auto n₀₀ = i == 0         || k == 0         ? airNode : get(i - 1, j, k - 1);
-            auto n₀₁ = i == 0         || k == chunkSize ? airNode : get(i - 1, j, k + 0);
-            auto n₁₀ = i == chunkSize || k == 0         ? airNode : get(i + 0, j, k - 1);
-            auto n₁₁ = i == chunkSize || k == chunkSize ? airNode : get(i + 0, j, k + 0);
+        if (Y < sizeTileY) for (int X = 0; X <= sizeTileX; X++) for (int Z = 0; Z <= sizeTileZ; Z++) {
+            auto n₀₀ = X == 0         || Z == 0         ? airNode : get(X - 1, Y, Z - 1);
+            auto n₀₁ = X == 0         || Z == sizeTileZ ? airNode : get(X - 1, Y, Z + 0);
+            auto n₁₀ = X == sizeTileX || Z == 0         ? airNode : get(X + 0, Y, Z - 1);
+            auto n₁₁ = X == sizeTileX || Z == sizeTileZ ? airNode : get(X + 0, Y, Z + 0);
 
-            if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i][k].v3(j + 1));
+            if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[X][Z].v3(Y), corners[X][Z].v3(Y + 1));
         }
     }
 }
@@ -396,24 +396,24 @@ inline void uploadDomain(Chunk * chunk, ShaderProgram<Spec> * shader) {
 }
 
 void Chunk::renderFaces(FaceShader * shader, int Y₁, int Y₂) {
-    // We assume that Y₂ − Y₁ ≥ worldHeight and [Y₁; Y₂] ∩ [0; worldHeight] ≠ ø.
+    // We assume that Y₂ − Y₁ ≥ sizeTileY and [Y₁; Y₂] ∩ [0; sizeTileY] ≠ ø.
 
     using namespace Fundamentals;
 
     uploadDomain(this, shader);
 
     if (Y₁ < 0) {
-        shader->uniform<float>("cameraTileY", -worldHeight);
-        faces.draw(GL_TRIANGLES, facesLowerOffsetY(Y₁ + worldHeight), facesUpperOffsetY(worldTop));
+        shader->uniform<float>("cameraTileY", -sizeTileY);
+        faces.draw(GL_TRIANGLES, facesLowerOffsetY(Y₁ + sizeTileY), facesUpperOffsetY(maxTileY));
 
         shader->uniform<float>("cameraTileY", 0);
         faces.draw(GL_TRIANGLES, 0, facesUpperOffsetY(Y₂));
-    } else if (worldHeight <= Y₂) {
+    } else if (sizeTileY <= Y₂) {
         shader->uniform<float>("cameraTileY", 0);
-        faces.draw(GL_TRIANGLES, facesLowerOffsetY(Y₁), facesUpperOffsetY(worldTop));
+        faces.draw(GL_TRIANGLES, facesLowerOffsetY(Y₁), facesUpperOffsetY(maxTileY));
 
-        shader->uniform<float>("cameraTileY", worldHeight);
-        faces.draw(GL_TRIANGLES, 0, facesUpperOffsetY(Y₂ - worldHeight));
+        shader->uniform<float>("cameraTileY", sizeTileY);
+        faces.draw(GL_TRIANGLES, 0, facesUpperOffsetY(Y₂ - sizeTileY));
     } else {
         shader->uniform<float>("cameraTileY", 0);
         faces.draw(GL_TRIANGLES, facesLowerOffsetY(Y₁), facesUpperOffsetY(Y₂));
@@ -426,28 +426,28 @@ void Chunk::renderEdges(EdgeShader * shader, int Y₁, int Y₂) {
     uploadDomain(this, shader);
 
     if (Y₁ < 0) {
-        shader->uniform<float>("cameraTileY", -worldHeight);
-        edges.draw(GL_LINES, edgesLowerOffsetY(Y₁ + worldHeight), edgesUpperOffsetY(worldTop));
+        shader->uniform<float>("cameraTileY", -sizeTileY);
+        edges.draw(GL_LINES, edgesLowerOffsetY(Y₁ + sizeTileY), edgesUpperOffsetY(maxTileY));
 
         shader->uniform<float>("cameraTileY", 0);
         edges.draw(GL_LINES, 0, edgesUpperOffsetY(Y₂));
-    } else if (worldHeight <= Y₂) {
+    } else if (sizeTileY <= Y₂) {
         shader->uniform<float>("cameraTileY", 0);
-        edges.draw(GL_LINES, edgesLowerOffsetY(Y₁), edgesUpperOffsetY(worldTop));
+        edges.draw(GL_LINES, edgesLowerOffsetY(Y₁), edgesUpperOffsetY(maxTileY));
 
-        shader->uniform<float>("cameraTileY", worldHeight);
-        edges.draw(GL_LINES, 0, edgesUpperOffsetY(Y₂ - worldHeight));
+        shader->uniform<float>("cameraTileY", sizeTileY);
+        edges.draw(GL_LINES, 0, edgesUpperOffsetY(Y₂ - sizeTileY));
     } else {
         shader->uniform<float>("cameraTileY", 0);
         edges.draw(GL_LINES, edgesLowerOffsetY(Y₁), edgesUpperOffsetY(Y₂));
     }
 }
 
-bool Chunk::touch(const Gyrovector<Real> & w, Rank i, Rank j) {
-    const auto & A = Tesselation::corners[i + 0][j + 0];
-    const auto & B = Tesselation::corners[i + 1][j + 0];
-    const auto & C = Tesselation::corners[i + 1][j + 1];
-    const auto & D = Tesselation::corners[i + 0][j + 1];
+bool Chunk::touch(const Gyrovector<Real> & w, int X, int Z) {
+    const auto & A = Tesselation::corners[X + 0][Z + 0];
+    const auto & B = Tesselation::corners[X + 1][Z + 0];
+    const auto & C = Tesselation::corners[X + 1][Z + 1];
+    const auto & D = Tesselation::corners[X + 0][Z + 1];
 
     return Math::samesign(
         w.sub(A).cross(B.sub(A)),
@@ -457,7 +457,7 @@ bool Chunk::touch(const Gyrovector<Real> & w, Rank i, Rank j) {
     );
 }
 
-std::pair<Rank, Rank> Chunk::round(const Gyrovector<Real> & w)
+std::pair<int, int> Chunk::round(const Gyrovector<Real> & w)
 { return Tesselation::unapply(w.x(), w.y()); }
 
 bool Chunk::isInsideOfDomain(const Gyrovector<Real> & w₀) {
@@ -466,9 +466,9 @@ bool Chunk::isInsideOfDomain(const Gyrovector<Real> & w₀) {
     // We are using symmetry of grid along axes here
     Gyrovector<Real> w(fabs(w₀.x()), fabs(w₀.y()));
 
-    for (Rank i = 0; i < chunkSize; i++) {
-        const auto & A = Tesselation::corners[chunkSize][i + 0];
-        const auto & B = Tesselation::corners[chunkSize][i + 1];
+    for (int Z = 0; Z < sizeTileZ; Z++) {
+        const auto & A = Tesselation::corners[sizeTileX][Z + 0];
+        const auto & B = Tesselation::corners[sizeTileX][Z + 1];
 
         if (Math::samesign(w.sub(A).cross(B.sub(A)), w.sub(B).cross(-B), w.cross(A)))
             return true;
