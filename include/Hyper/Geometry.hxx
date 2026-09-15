@@ -114,6 +114,16 @@ private:
     bool _working = false; std::future<void> worker;
     FaceShader::VAO faces; EdgeShader::VAO edges;
 
+    GLsizei facesOffsetY[Fundamentals::worldHeight];
+    GLsizei edgesLowerOffsetY[Fundamentals::worldHeight];
+    GLsizei edgesUpperOffsetY[Fundamentals::worldHeight];
+
+    inline GLsizei facesLowerOffsetY(const Level H) const
+    { return H > 0 ? facesOffsetY[H - 1] : 0; }
+
+    inline GLsizei facesUpperOffsetY(const Level H) const
+    { return facesOffsetY[H]; }
+
     bool _ready = false, _dirty = false, _needRefresh = false, _needUnload = false, needUpdateVAO = false;
 
     Blob * _blob = nullptr;
@@ -126,8 +136,8 @@ public:
     void emitFaces(NodeRegistry &);
     void emitEdges(NodeRegistry &);
 
-    void renderFaces(FaceShader *, unsigned int);
-    void renderEdges(EdgeShader *, unsigned int);
+    void renderFaces(FaceShader *, int, int);
+    void renderEdges(EdgeShader *, int, int);
 
     void updateMatrix(const Fuchsian<Integer> &);
     void refresh(NodeRegistry &);

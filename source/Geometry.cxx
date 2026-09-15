@@ -253,24 +253,28 @@ void Chunk::emitFaces(NodeRegistry & nodeRegistry) {
 
     faces.clear();
 
-    for (int j = 0; j <= worldTop; j++) for (int i = 0; i < chunkSize; i++) for (int k = 0; k < chunkSize; k++) {
-        auto id = get(i, j, k).id;
+    for (int j = 0; j <= worldTop; j++) {
+        for (int i = 0; i < chunkSize; i++) for (int k = 0; k < chunkSize; k++) {
+            auto id = get(i, j, k).id;
 
-        if (id == 0) continue;
+            if (id == 0) continue;
 
-        Mask mask;
+            Mask mask;
 
-        mask.top    = (j == worldTop)      || (get(i + 0, j + 1, k + 0).id == 0);
-        mask.bottom = (j == 0)             || (get(i + 0, j - 1, k + 0).id == 0);
-        mask.back   = (k == 0)             || (get(i + 0, j + 0, k - 1).id == 0);
-        mask.front  = (k == chunkSize - 1) || (get(i + 0, j + 0, k + 1).id == 0);
-        mask.left   = (i == 0)             || (get(i - 1, j + 0, k + 0).id == 0);
-        mask.right  = (i == chunkSize - 1) || (get(i + 1, j + 0, k + 0).id == 0);
+            mask.top    = (j == worldTop)      || (get(i + 0, j + 1, k + 0).id == 0);
+            mask.bottom = (j == 0)             || (get(i + 0, j - 1, k + 0).id == 0);
+            mask.back   = (k == 0)             || (get(i + 0, j + 0, k - 1).id == 0);
+            mask.front  = (k == chunkSize - 1) || (get(i + 0, j + 0, k + 1).id == 0);
+            mask.left   = (i == 0)             || (get(i - 1, j + 0, k + 0).id == 0);
+            mask.right  = (i == chunkSize - 1) || (get(i + 1, j + 0, k + 0).id == 0);
 
-        if (nodeRegistry.has(id)) {
-            auto nodeDef = nodeRegistry.get(id);
-            drawNode(faces, nodeDef.cube, mask, i, j, k);
+            if (nodeRegistry.has(id)) {
+                auto nodeDef = nodeRegistry.get(id);
+                drawNode(faces, nodeDef.cube, mask, i, j, k);
+            }
         }
+
+        facesOffsetY[j] = faces.eboElementCount();
     }
 }
 
@@ -312,15 +316,8 @@ void Chunk::emitEdges(NodeRegistry &) {
 
     Node airNode = {.id = 0}; // TODO
 
-    for (int j = 0; j < worldHeight; j++) {
-        for (int i = 0; i <= chunkSize; i++) for (int k = 0; k <= chunkSize; k++) {
-            auto n₀₀ = i == 0         || k == 0         ? airNode : get(i - 1, j, k - 1);
-            auto n₀₁ = i == 0         || k == chunkSize ? airNode : get(i - 1, j, k + 0);
-            auto n₁₀ = i == chunkSize || k == 0         ? airNode : get(i + 0, j, k - 1);
-            auto n₁₁ = i == chunkSize || k == chunkSize ? airNode : get(i + 0, j, k + 0);
-
-            if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i][k].v3(j + 1));
-        }
+    for (int j = 0; j <= worldHeight; j++) {
+        if (j < worldHeight) edgesLowerOffsetY[j] = edges.eboElementCount();
 
         for (int i = 0; i < chunkSize; i++) for (int k = 0; k <= chunkSize; k++) {
             auto n₀₀ = j == 0           || k == 0         ? airNode : get(i, j - 1, k - 1);
@@ -338,6 +335,17 @@ void Chunk::emitEdges(NodeRegistry &) {
             auto n₁₁ = i == chunkSize || j == worldHeight ? airNode : get(i + 0, j + 0, k);
 
             if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i][k + 1].v3(j));
+        }
+
+        if (j > 0) edgesUpperOffsetY[j - 1] = edges.eboElementCount();
+
+        if (j < worldHeight) for (int i = 0; i <= chunkSize; i++) for (int k = 0; k <= chunkSize; k++) {
+            auto n₀₀ = i == 0         || k == 0         ? airNode : get(i - 1, j, k - 1);
+            auto n₀₁ = i == 0         || k == chunkSize ? airNode : get(i - 1, j, k + 0);
+            auto n₁₀ = i == chunkSize || k == 0         ? airNode : get(i + 0, j, k - 1);
+            auto n₁₁ = i == chunkSize || k == chunkSize ? airNode : get(i + 0, j, k + 0);
+
+            if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i][k].v3(j + 1));
         }
     }
 }
@@ -378,11 +386,53 @@ inline void uploadDomain(Chunk * chunk, ShaderProgram<Spec> * shader) {
     shader->uniform("domain.d", chunk->domain().d);
 }
 
-void Chunk::renderFaces(FaceShader * shader, unsigned int count)
-{ uploadDomain(this, shader); faces.drawInstanced(GL_TRIANGLES, count); }
+void Chunk::renderFaces(FaceShader * shader, int Y₁, int Y₂) {
+    // We assume that Y₂ − Y₁ ≥ worldHeight and [Y₁; Y₂] ∩ [0; worldHeight] ≠ ø.
 
-void Chunk::renderEdges(EdgeShader * shader, unsigned int count)
-{ uploadDomain(this, shader); edges.drawInstanced(GL_LINES, count); }
+    using namespace Fundamentals;
+
+    uploadDomain(this, shader);
+
+    if (Y₁ < 0) {
+        shader->uniform<float>("cameraTileY", -worldHeight);
+        faces.draw(GL_TRIANGLES, facesLowerOffsetY(Y₁ + worldHeight), facesUpperOffsetY(worldTop));
+
+        shader->uniform<float>("cameraTileY", 0);
+        faces.draw(GL_TRIANGLES, 0, facesUpperOffsetY(Y₂));
+    } else if (worldHeight <= Y₂) {
+        shader->uniform<float>("cameraTileY", 0);
+        faces.draw(GL_TRIANGLES, facesLowerOffsetY(Y₁), facesUpperOffsetY(worldTop));
+
+        shader->uniform<float>("cameraTileY", worldHeight);
+        faces.draw(GL_TRIANGLES, 0, facesUpperOffsetY(Y₂ - worldHeight));
+    } else {
+        shader->uniform<float>("cameraTileY", 0);
+        faces.draw(GL_TRIANGLES, facesLowerOffsetY(Y₁), facesUpperOffsetY(Y₂));
+    }
+}
+
+void Chunk::renderEdges(EdgeShader * shader, int Y₁, int Y₂) {
+    using namespace Fundamentals;
+
+    uploadDomain(this, shader);
+
+    if (Y₁ < 0) {
+        shader->uniform<float>("cameraTileY", -worldHeight);
+        edges.draw(GL_LINES, edgesLowerOffsetY[Y₁ + worldHeight], edgesUpperOffsetY[worldTop]);
+
+        shader->uniform<float>("cameraTileY", 0);
+        edges.draw(GL_LINES, 0, edgesUpperOffsetY[Y₂]);
+    } else if (worldHeight <= Y₂) {
+        shader->uniform<float>("cameraTileY", 0);
+        edges.draw(GL_LINES, edgesLowerOffsetY[Y₁], edgesUpperOffsetY[worldTop]);
+
+        shader->uniform<float>("cameraTileY", worldHeight);
+        edges.draw(GL_LINES, 0, edgesUpperOffsetY[Y₂ - worldHeight]);
+    } else {
+        shader->uniform<float>("cameraTileY", 0);
+        edges.draw(GL_LINES, edgesLowerOffsetY[Y₁], edgesUpperOffsetY[Y₂]);
+    }
+}
 
 bool Chunk::touch(const Gyrovector<Real> & w, Rank i, Rank j) {
     const auto & A = Tesselation::corners[i + 0][j + 0];

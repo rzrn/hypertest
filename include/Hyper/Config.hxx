@@ -23,8 +23,8 @@ struct Config {
     } window;
 
     struct {
-        unsigned int verticalRenderDistance = 2;
         Real horizontalRenderDistance = 10.0;
+        Real verticalRenderDistance = 64.0;
 
         Real fov = 80.0, near = 1e-3, far = 150.0;
         Model model = {Gans};

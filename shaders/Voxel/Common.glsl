@@ -21,23 +21,33 @@ vec2 applyModel(vec2 z);
 uniform mat4 projection;
 uniform mat4 view;
 
-uniform Moebius domain;
 uniform Moebius origin;
+uniform float cameraTileY;
+
+uniform Moebius domain;
+uniform float cameraY;
 
 uniform float hrd, vrd, worldHeight;
 
-vec4 model(vec3 v, int iid) {
+vec4 model(vec3 v) {
     vec2 w = applyModel(apply(origin, apply(domain, v.xy)));
-    return vec4(w.x, v.z + (iid - vrd) * worldHeight, w.y, 1.0);
+    return vec4(w.x, v.z + cameraTileY, w.y, 1.0);
 }
 
 struct Fog { bool enabled; vec4 color; float near, far; };
 
 uniform Fog fog;
 
-float getFogFactor(float d) {
+float getHorizFogFactor(float d) {
     if (fog.enabled)
         return clamp(1.0 - (fog.far - d) / (fog.far - fog.near), 0.0, 1.0);
+    else
+        return 0.0;
+}
+
+float getVertFogFactor(float y) {
+    if (fog.enabled)
+        return clamp(abs(y - cameraY) / vrd, 0.0, 1.0);
     else
         return 0.0;
 }

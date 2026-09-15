@@ -10,7 +10,7 @@ return {
 
     camera = {
         horizontalRenderDistance = 5,
-        verticalRenderDistance   = 3,
+        verticalRenderDistance   = 64,
         fov                      = 80,
         near                     = 1e-2,
         far                      = 150,

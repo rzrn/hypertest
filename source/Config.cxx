@@ -1,6 +1,8 @@
 #include <Hyper/Config.hxx>
 
 Config::Config(LuaJIT * luajit, const char * filename) {
+    using namespace Fundamentals;
+
     if (LuaTable config = luajit->require(filename)) {
         if (LuaString world_v = config.getitem("world"))
             world = world_v.decode();
@@ -17,8 +19,8 @@ Config::Config(LuaJIT * luajit, const char * filename) {
         }
 
         if (LuaTable camera_v = config.getitem("camera")) {
-            if (LuaInteger vrd_v = camera_v.getitem("verticalRenderDistance"))
-                camera.verticalRenderDistance = vrd_v.decode();
+            if (LuaNumber vrd_v = camera_v.getitem("verticalRenderDistance"))
+                camera.verticalRenderDistance = std::clamp(vrd_v.decode(), 8.0, worldHeight / 2.0);
 
             if (LuaNumber hrd_v = camera_v.getitem("horizontalRenderDistance"))
                 camera.horizontalRenderDistance = hrd_v.decode();

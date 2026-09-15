@@ -163,7 +163,7 @@ void pollNeighbours() {
 }
 
 template<ShaderSpec Spec>
-inline void uploadMVP(ShaderProgram<Spec> * shader, Aut𝔻<Real> & origin) {
+inline void uploadMVP(ShaderProgram<Spec> * shader, Aut𝔻<Real> & origin, Real cameraY) {
     shader->uniform("view", view);
     shader->uniform("projection", projection);
 
@@ -171,12 +171,14 @@ inline void uploadMVP(ShaderProgram<Spec> * shader, Aut𝔻<Real> & origin) {
     shader->uniform("origin.b", origin.b);
     shader->uniform("origin.c", origin.c());
     shader->uniform("origin.d", origin.d());
+
+    shader->uniform("cameraY", float(cameraY));
 }
 
 const double saveInterval = 1.0;
 
 double globaltime = 0, saveTimer = 0;
-void display(GLFWwindow * window) {
+void display(GLFWwindow * window, Config & config) {
     using namespace Game;
 
     auto dt = glfwGetTime() - globaltime;
@@ -227,8 +229,10 @@ void display(GLFWwindow * window) {
         );
     }
 
+    auto cameraY = player.camera().climb + player.eye;
+
     auto direction = player.camera().direction(), right = player.camera().right(), up = glm::cross(right, direction);
-    auto eye = vec3(0.0f, -player.camera().climb - player.eye, 0.0f);
+    auto eye = vec3(0.0f, -cameraY, 0.0f);
 
     view = glm::lookAt(vec3(0.0f), direction, up);
     view = glm::scale(view, vec3(1.0f, Render::standard->meter, 1.0f));
@@ -241,26 +245,27 @@ void display(GLFWwindow * window) {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
 
-    unsigned int nvert = 2 * Render::vmax + 1;
+    const Real & vrd = config.camera.verticalRenderDistance;
+    int Y₁ = std::floor(cameraY - vrd), Y₂ = std::floor(cameraY + vrd);
 
     faceShader->activate();
-    uploadMVP(faceShader, origin);
+    uploadMVP(faceShader, origin, cameraY);
 
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(1.0, 1.0);
 
     for (auto & chunk : atlas.pool)
         if (chunk->ready())
-            chunk->renderFaces(faceShader, nvert);
+            chunk->renderFaces(faceShader, Y₁, Y₂);
 
     glDisable(GL_POLYGON_OFFSET_FILL);
 
     edgeShader->activate();
-    uploadMVP(edgeShader, origin);
+    uploadMVP(edgeShader, origin, cameraY);
 
     for (auto & chunk : atlas.pool)
         if (chunk->ready())
-            chunk->renderEdges(edgeShader, nvert);
+            chunk->renderEdges(edgeShader, Y₁, Y₂);
 
     if (auto value = pbo.read(Window::width/2 - 1, Window::height/2))
     { auto [zbuffer, action] = *value; click(origin, zbuffer, action); }
@@ -709,7 +714,7 @@ int main(int argc, char * argv[]) {
     glfwSetTime(0);
 
     while (!glfwWindowShouldClose(window)) {
-        display(window);
+        display(window, config);
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
