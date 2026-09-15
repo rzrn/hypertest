@@ -18,7 +18,7 @@ vec2 apply(Moebius M, vec2 z)
 
 vec2 applyModel(vec2 z);
 
-uniform float hrd, vrd, worldHeight;
+uniform float hrd, vrd;
 
 uniform Moebius cameraTileXZ;
 uniform float cameraTileY;

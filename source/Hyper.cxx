@@ -598,8 +598,6 @@ template<ShaderSpec Spec>
 inline void uploadPrims(ShaderProgram<Spec> * shader, Config & config) {
     shader->uniform("vrd",         float(config.camera.verticalRenderDistance));
     shader->uniform("hrd",         float(config.camera.horizontalRenderDistance));
-    shader->uniform("worldHeight", float(Fundamentals::worldHeight));
-
     shader->uniform("fog.enabled", config.fog.enabled);
     shader->uniform("fog.near",    config.fog.near);
     shader->uniform("fog.far",     config.fog.far);
