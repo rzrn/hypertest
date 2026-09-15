@@ -54,7 +54,7 @@ struct Object {
 
 class Entity {
 private:
-    int _i, _j; Object _camera; Atlas * _atlas; Chunk * _chunk;
+    int _X, _Z; Object _camera; Atlas * _atlas; Chunk * _chunk;
 
     bool jumped = false;
 
@@ -66,7 +66,7 @@ public:
 
     bool flymode = false, noclip = false;
 
-    Entity(Atlas * atlas) : _i(0), _j(0), _atlas(atlas), _chunk(nullptr) {}
+    Entity(Atlas * atlas) : _X(0), _Z(0), _atlas(atlas), _chunk(nullptr) {}
 
     bool stuck();
     bool stuck(Chunk *, int, Real, int);
@@ -83,8 +83,8 @@ public:
     inline constexpr const auto & atlas()  const { return _atlas;  }
     inline constexpr const auto & chunk()  const { return _chunk;  }
 
-    inline constexpr const auto & i() const { return _i; }
-    inline constexpr const auto & j() const { return _j; }
+    inline constexpr const auto & X() const { return _X; }
+    inline constexpr const auto & Z() const { return _Z; }
 
     constexpr inline void jumpHeight(Real height)
     { jumpSpeed = sqrt(2 * gravity * height); }

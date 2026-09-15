@@ -61,7 +61,7 @@ bool Entity::stuck(Chunk * C, int X, Real y, int Z) {
     return false;
 }
 
-bool Entity::stuck() { return stuck(_chunk, _i, _camera.climb, _j); }
+bool Entity::stuck() { return stuck(_chunk, _X, _camera.climb, _Z); }
 
 bool Entity::moveHorizontally(const Gyrovector<Real> & v, const Real dt) {
     auto [P, chunkChanged] = _camera.position.move(v.scale(dt));
@@ -70,9 +70,9 @@ bool Entity::moveHorizontally(const Gyrovector<Real> & v, const Real dt) {
     if (C != nullptr) {
         if (!C->ready()) return false;
 
-        auto [i, j] = P.round(C);
-        if (stuck(C, i, _camera.climb, j)) return false;
-        _i = i; _j = j;
+        auto [X, Z] = P.round(C);
+        if (stuck(C, X, _camera.climb, Z)) return false;
+        _X = X; _Z = Z;
     }
 
     _chunk = C; _camera.position = P; return chunkChanged;
@@ -117,10 +117,10 @@ bool Entity::moveVertically(const Real dt) {
 
     if (jumped) { roc += jumpSpeed; jumped = false; }
 
-    auto L = Chunk::clamp(_camera.climb + dt * roc);
+    auto Y = Chunk::clamp(_camera.climb + dt * roc);
 
-    if (stuck(_chunk, _i, L, _j)) { _camera.roc = 0; _camera.flying = false; }
-    else { _camera.climb = L; _camera.roc = roc; _camera.flying = true; }
+    if (stuck(_chunk, _X, Y, _Z)) { _camera.roc = 0; _camera.flying = false; }
+    else { _camera.climb = Y; _camera.roc = roc; _camera.flying = true; }
 
     return false;
 }
