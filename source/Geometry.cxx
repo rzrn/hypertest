@@ -261,8 +261,11 @@ void Chunk::emitFaces(NodeRegistry & nodeRegistry) {
 
             Mask mask;
 
-            mask.top    = (j == worldTop)      || (get(i + 0, j + 1, k + 0).id == 0);
-            mask.bottom = (j == 0)             || (get(i + 0, j - 1, k + 0).id == 0);
+            Node n₁ = j == worldTop ? get(i, 0,        k) : get(i, j + 1, k);
+            Node n₂ = j == 0        ? get(i, worldTop, k) : get(i, j - 1, k);
+
+            mask.top    = (n₁.id == 0);
+            mask.bottom = (n₂.id == 0);
             mask.back   = (k == 0)             || (get(i + 0, j + 0, k - 1).id == 0);
             mask.front  = (k == chunkSize - 1) || (get(i + 0, j + 0, k + 1).id == 0);
             mask.left   = (i == 0)             || (get(i - 1, j + 0, k + 0).id == 0);
@@ -319,20 +322,22 @@ void Chunk::emitEdges(NodeRegistry &) {
     for (int j = 0; j <= worldHeight; j++) {
         if (j < worldHeight) edgesLowerOffsetY[j] = edges.eboElementCount();
 
+        // TODO: maybe it would be better for `get(...)` to wrap its arguments?
+
         for (int i = 0; i < chunkSize; i++) for (int k = 0; k <= chunkSize; k++) {
-            auto n₀₀ = j == 0           || k == 0         ? airNode : get(i, j - 1, k - 1);
-            auto n₀₁ = j == 0           || k == chunkSize ? airNode : get(i, j - 1, k + 0);
-            auto n₁₀ = j == worldHeight || k == 0         ? airNode : get(i, j + 0, k - 1);
-            auto n₁₁ = j == worldHeight || k == chunkSize ? airNode : get(i, j + 0, k + 0);
+            auto n₀₀ = k == 0         ? airNode : j == 0           ? get(i, worldTop, k - 1) : get(i, j - 1, k - 1);
+            auto n₀₁ = k == chunkSize ? airNode : j == 0           ? get(i, worldTop, k + 0) : get(i, j - 1, k + 0);
+            auto n₁₀ = k == 0         ? airNode : j == worldHeight ? get(i, 0,        k - 1) : get(i, j + 0, k - 1);
+            auto n₁₁ = k == chunkSize ? airNode : j == worldHeight ? get(i, 0,        k + 0) : get(i, j + 0, k + 0);
 
             if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i + 1][k].v3(j));
         }
 
         for (int i = 0; i <= chunkSize; i++) for (int k = 0; k < chunkSize; k++) {
-            auto n₀₀ = i == 0         || j == 0           ? airNode : get(i - 1, j - 1, k);
-            auto n₀₁ = i == 0         || j == worldHeight ? airNode : get(i - 1, j + 0, k);
-            auto n₁₀ = i == chunkSize || j == 0           ? airNode : get(i + 0, j - 1, k);
-            auto n₁₁ = i == chunkSize || j == worldHeight ? airNode : get(i + 0, j + 0, k);
+            auto n₀₀ = i == 0         ? airNode : j == 0           ? get(i - 1, worldTop, k) : get(i - 1, j - 1, k);
+            auto n₀₁ = i == 0         ? airNode : j == worldHeight ? get(i - 1, 0,        k) : get(i - 1, j + 0, k);
+            auto n₁₀ = i == chunkSize ? airNode : j == 0           ? get(i + 0, worldTop, k) : get(i + 0, j - 1, k);
+            auto n₁₁ = i == chunkSize ? airNode : j == worldHeight ? get(i + 0, 0,        k) : get(i + 0, j + 0, k);
 
             if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[i][k].v3(j), corners[i][k + 1].v3(j));
         }
