@@ -35,7 +35,7 @@ DEPS    = Lua
 MODULES = Hyper Config Shader Geometry Sheet Physics Game
 HEADERS = Math/Gaussian Math/Fuchsian Hyper/Fundamentals \
           Math/Basic Math/Gyrovector Math/Moebius Math/AutD Math/Euclidean \
-          Meta/Basic Meta/Enumerable Meta/List Meta/Literal Meta/Tuple
+          Meta/Basic Meta/Enumerable Meta/List Meta/Literal Meta/Tuple Meta/DoubleBuffer
 
 add = $(addprefix $(2)/,$(addsuffix $(1),$(3)))
 
