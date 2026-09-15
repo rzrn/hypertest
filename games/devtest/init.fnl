@@ -11,10 +11,10 @@
 (local node₅ (core.register core.NODE {:name "Stuff 5" :textures [texture₅ texture₅ texture₅ texture₅ texture₅ texture₅]}))
 
 (core.override
-  {:eye     1.62
-   :height  1.8
+  {:eye     2.5
+   :height  2.7
    :gravity 9.8
-   :jump    1.25
+   :jump    2.05
    :walk    3.0})
 
 (core.setHotbar 0 node₂)
