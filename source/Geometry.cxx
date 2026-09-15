@@ -380,10 +380,10 @@ void Chunk::updateMatrix(const Fuchsian<Integer> & origin) {
 
 template<ShaderSpec Spec>
 inline void uploadDomain(Chunk * chunk, ShaderProgram<Spec> * shader) {
-    shader->uniform("domain.a", chunk->domain().a);
-    shader->uniform("domain.b", chunk->domain().b);
-    shader->uniform("domain.c", chunk->domain().c);
-    shader->uniform("domain.d", chunk->domain().d);
+    shader->uniform("cameraTileXZ.a", chunk->domain().a);
+    shader->uniform("cameraTileXZ.b", chunk->domain().b);
+    shader->uniform("cameraTileXZ.c", chunk->domain().c);
+    shader->uniform("cameraTileXZ.d", chunk->domain().d);
 }
 
 void Chunk::renderFaces(FaceShader * shader, int Y₁, int Y₂) {

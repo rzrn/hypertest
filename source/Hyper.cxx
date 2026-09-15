@@ -163,14 +163,14 @@ void pollNeighbours() {
 }
 
 template<ShaderSpec Spec>
-inline void uploadMVP(ShaderProgram<Spec> * shader, Aut𝔻<Real> & origin, Real cameraY) {
+inline void uploadMVP(ShaderProgram<Spec> * shader, Aut𝔻<Real> & cameraXZ, Real cameraY) {
     shader->uniform("view", view);
     shader->uniform("projection", projection);
 
-    shader->uniform("origin.a", origin.a);
-    shader->uniform("origin.b", origin.b);
-    shader->uniform("origin.c", origin.c());
-    shader->uniform("origin.d", origin.d());
+    shader->uniform("cameraXZ.a", cameraXZ.a);
+    shader->uniform("cameraXZ.b", cameraXZ.b);
+    shader->uniform("cameraXZ.c", cameraXZ.c());
+    shader->uniform("cameraXZ.d", cameraXZ.d());
 
     shader->uniform("cameraY", float(cameraY));
 }

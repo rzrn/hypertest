@@ -18,19 +18,19 @@ vec2 apply(Moebius M, vec2 z)
 
 vec2 applyModel(vec2 z);
 
+uniform float hrd, vrd, worldHeight;
+
+uniform Moebius cameraTileXZ;
+uniform float cameraTileY;
+
+uniform Moebius cameraXZ;
+uniform float cameraY;
+
 uniform mat4 projection;
 uniform mat4 view;
 
-uniform Moebius origin;
-uniform float cameraTileY;
-
-uniform Moebius domain;
-uniform float cameraY;
-
-uniform float hrd, vrd, worldHeight;
-
 vec4 model(vec3 v) {
-    vec2 w = applyModel(apply(origin, apply(domain, v.xy)));
+    vec2 w = applyModel(apply(cameraXZ, apply(cameraTileXZ, v.xy)));
     return vec4(w.x, v.z + cameraTileY, w.y, 1.0);
 }
 
