@@ -39,10 +39,12 @@ void drawAim(DummyShader::VAO & vao) {
 
     auto wpixel = 1.0 / GLfloat(Window::width), hpixel = 1.0 / GLfloat(Window::height);
 
-    vao.push(); vao.emit(vec3(-GLfloat(GUI::aimSize) * wpixel, 0, 0), white, origin, 1.0f);
-    vao.push(); vao.emit(vec3(+GLfloat(GUI::aimSize) * wpixel, 0, 0), white, origin, 1.0f);
-    vao.push(); vao.emit(vec3(0, -GLfloat(GUI::aimSize) * hpixel, 0), white, origin, 1.0f);
-    vao.push(); vao.emit(vec3(0, +GLfloat(GUI::aimSize) * hpixel, 0), white, origin, 1.0f);
+    GLfloat wsize = std::floor(GUI::aimSize) * wpixel, hsize = std::floor(GUI::aimSize) * hpixel;
+
+    vao.push(); vao.emit(vec3(-wsize, 0, 0), white, origin, 1.0f);
+    vao.push(); vao.emit(vec3(+wsize, 0, 0), white, origin, 1.0f);
+    vao.push(); vao.emit(vec3(0, -hsize, 0), white, origin, 1.0f);
+    vao.push(); vao.emit(vec3(0, +hsize, 0), white, origin, 1.0f);
 
     vao.upload(GL_STATIC_DRAW);
 }
@@ -186,6 +188,18 @@ void display(GLFWwindow * window, Config & config) {
     auto dt = glfwGetTime() - globaltime;
     globaltime += dt; saveTimer += dt;
 
+    {
+        using namespace GUI;
+        constexpr Real τ = 0.1;
+
+        aimSize = (aimSize * τ + aimTargetSize * dt) / (τ + dt);
+
+        static int size₁ = 0; int size₂ = std::floor(aimSize);
+        if (size₁ != size₂) drawAim(aimVao);
+
+        size₁ = size₂;
+    }
+
     using namespace std::complex_literals;
 
     auto dir = 0i;
@@ -316,9 +330,14 @@ void mouseButtonCallback(GLFWwindow * window, int button, int action, int mods) 
     using namespace Game;
 
     if (Mouse::grabbed) {
-        if (action == GLFW_PRESS) switch (button) {
-            case GLFW_MOUSE_BUTTON_LEFT:  pbo.issue(Action::Remove); break;
-            case GLFW_MOUSE_BUTTON_RIGHT: pbo.issue(Action::Place);  break;
+        if (action == GLFW_PRESS) {
+            using namespace Game::GUI;
+            aimSize = 1.75 * aimTargetSize;
+
+            switch (button) {
+                case GLFW_MOUSE_BUTTON_LEFT:  pbo.issue(Action::Remove); break;
+                case GLFW_MOUSE_BUTTON_RIGHT: pbo.issue(Action::Place);  break;
+            }
         }
     } else if (Window::hovered && Window::focused) {
         if (action == GLFW_PRESS && button == GLFW_MOUSE_BUTTON_LEFT)
@@ -403,11 +422,18 @@ inline void hotbarSelect(size_t slot) {
     updateHotbar();
 }
 
+inline void crosshairBlink() {
+    using namespace Game::GUI;
+    aimSize = 2.25 * aimTargetSize;
+}
+
 inline void returnToSpawn() {
     using namespace Game;
 
     player.teleport(Position(), 5);
     player.roc(0); pollNeighbours();
+
+    crosshairBlink();
 }
 
 inline void toggleFlyMode() {
@@ -415,12 +441,16 @@ inline void toggleFlyMode() {
 
     player.roc(0);
     player.flymode = !player.flymode;
+
+    crosshairBlink();
 }
 
 inline void toggleNoclip() {
     using namespace Game;
 
     player.noclip = !player.noclip;
+
+    crosshairBlink();
 }
 
 void keyboardCallback(GLFWwindow * window, int key, int scancode, int action, int mods) {
@@ -480,7 +510,6 @@ void setupWindowSize(GLFWwindow * window, int width, int height) {
     projection = glm::perspective(glm::radians(fov), Window::aspect, near, far);
 
     updateHotbar();
-    drawAim(aimVao);
 }
 
 constexpr auto title = "Hypertest";
@@ -635,7 +664,9 @@ void setupGL(GLFWwindow * window, Config & config) {
 
     aimVao.initialize();
 
-    GUI::aimSize = config.gui.aimSize;
+    GUI::aimSize       = config.gui.aimSize;
+    GUI::aimTargetSize = config.gui.aimSize;
+
     setupWindowSize(window, Window::width, Window::height);
 
     pbo.initialize();

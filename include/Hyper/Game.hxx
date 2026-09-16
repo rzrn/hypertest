@@ -40,7 +40,8 @@ namespace Game {
     }
 
     namespace GUI {
-        extern int aimSize;
+        extern Real aimSize;
+        extern Real aimTargetSize;
     }
 
     namespace Keyboard {

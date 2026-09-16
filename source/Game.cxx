@@ -25,7 +25,7 @@ namespace Render {
 }
 
 namespace GUI {
-    int aimSize;
+    Real aimSize, aimTargetSize;
 }
 
 namespace Keyboard {
