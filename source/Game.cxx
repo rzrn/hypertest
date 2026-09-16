@@ -9,8 +9,8 @@ namespace Registry {
     NodeRegistry node;
 }
 
-Atlas atlas;
-Entity player(&atlas);
+WorldMap map;
+Entity player(&map);
 
 NodeId hotbar[hotbarSize] = {0};
 size_t activeSlot = 0;

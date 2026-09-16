@@ -16,7 +16,7 @@ namespace Game {
         extern Sheet sheet;
     }
 
-    extern Atlas atlas;
+    extern WorldMap map;
     extern Entity player;
 
     constexpr size_t hotbarSize = 9;

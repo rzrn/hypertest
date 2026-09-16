@@ -1,7 +1,7 @@
 #include <Hyper/Geometry.hxx>
 
 namespace Tesselation {
-    // Chunk’s neighbours in tesselation
+    // Tile’s neighbours in tesselation
     const Fuchsian<Integer> I { ℤi(+1, +0), ℤi(+0, +0), ℤi(+0, +0), ℤi(+1, +0) };
     const Fuchsian<Integer> U { ℤi(+6, +0), ℤi(+6, +6), ℤi(+1, -1), ℤi(+6, +0) };
     const Fuchsian<Integer> L { ℤi(+6, +0), ℤi(+6, -6), ℤi(+1, +1), ℤi(+6, +0) };
@@ -69,7 +69,7 @@ namespace Tesselation {
     const Array<Fuchsian<Integer>> neighbours = eval<Fuchsian<Integer>, Neighbours>();
     const Array<Aut𝔻<Real>> neighbours⁻¹ = inverse(eval<Aut𝔻<Real>, Neighbours>());
 
-    // Generation of chunk’s grid
+    // Generation of tile’s grid
 
     constexpr Real d = D½ / sqrt2;
 
@@ -104,7 +104,7 @@ namespace Tesselation {
     auto unapply(Real u, Real v) {
         auto [t₁, t₂] = Ψ⁻¹(u, v);
 
-        /* Chunk’s border is not exactly a hyperbolic line (i.e. circular arc on the Poincaré disk),
+        /* Tile’s border is not exactly a hyperbolic line (i.e. circular arc on the Poincaré disk),
            but its piecewise linear approximation; so there are parts of the outer blocks that extend
            slightly beyond the boundary of the ideal hyperbolic square.
            That’s why we need to “std::clamp” here.
@@ -145,17 +145,17 @@ NodeRegistry::NodeRegistry() {
     }});
 }
 
-Chunk::Chunk(const Fuchsian<Integer> & origin, const Fuchsian<Integer> & isometry) : _isometry(isometry) {
+WorldTile::WorldTile(const Fuchsian<Integer> & origin, const Fuchsian<Integer> & absoluteXZ) : _absoluteXZ(absoluteXZ) {
     /*
-        Unfortunately, precomposition of `isometry` with (z ↦ z × exp(iπk/2)) for k ∈ ℤ
-        will yield matrix able to render this chunk in the same place but rotated about its own center by πk/2 radians.
+        Unfortunately, precomposition of `absoluteXZ` with (z ↦ z × exp(iπk/2)) for k ∈ ℤ
+        will yield matrix able to render this tile in the same place but rotated about its own center by πk/2 radians.
 
-        So if we don’t resolve this ambiguity, the same chunk may render with different rotation
+        So if we don’t resolve this ambiguity, the same tile may render with different rotation
         according only to player’s path, and this will definitely crush the landscape
         (Imagine random rotations of chunks in Minecraft in a mountainous biome.)
 
         Since exp(iπk/2) ∈ {±1, ±i}, such rotation is equivalent to multiplying `a` and `c` by ±1/±i at the same time.
-        `isometry` is pre-divided by hcf(a, b, c, d), so there is always ability
+        `absoluteXZ` is pre-divided by hcf(a, b, c, d), so there is always ability
         to multiply *all* terms by ±1/±i yielding the same transformation.
         (Two Möbius transformations are equal iff their matrices differ by multiplicative constant.)
 
@@ -163,35 +163,36 @@ Chunk::Chunk(const Fuchsian<Integer> & origin, const Fuchsian<Integer> & isometr
         so that both components of `a` and `b` will be non-negative, that’s what we’re doing.
     */
 
-    // We assume that det(_isometry) = ad − bc ≠ 0, because:
+    // We assume that det(_absoluteXZ) = ad − bc ≠ 0, because:
     //  1) det(I), det(U), det(L), det(D), det(R) ≠ 0 (see above),
     //     so determinant from any of their product is also non-zero.
     //     (Since det(AB) = det(A)det(B) & ℂ is a field.)
     //  2) Matrix with zero determinant corresponds to constant transformation,
     //     but it makes no sense in this context.
-    if (!_isometry.a.isZero()) {
+    if (!_absoluteXZ.a.isZero()) {
         // a ≠ 0 and b ≠ 0
-        if (!_isometry.b.isZero()) _isometry.b.normalize(_isometry.a, _isometry.c, _isometry.d);
-        // det(_isometry) = ad − bc = ad ≠ 0, so a ≠ 0 and d ≠ 0
-        else _isometry.d.normalize(_isometry.a, _isometry.c);
+        if (!_absoluteXZ.b.isZero()) _absoluteXZ.b.normalize(_absoluteXZ.a, _absoluteXZ.c, _absoluteXZ.d);
+        // det(_absoluteXZ) = ad − bc = ad ≠ 0, so a ≠ 0 and d ≠ 0
+        else _absoluteXZ.d.normalize(_absoluteXZ.a, _absoluteXZ.c);
 
-        _isometry.a.normalize(_isometry.c);
+        _absoluteXZ.a.normalize(_absoluteXZ.c);
     } else {
-        // det(_isometry) = ad − bc = −bc ≠ 0, so b ≠ 0 and c ≠ 0
-        _isometry.b.normalize(_isometry.c, _isometry.d);
-        _isometry.c.normalize();
+        // det(_absoluteXZ) = ad − bc = −bc ≠ 0, so b ≠ 0 and c ≠ 0
+        _absoluteXZ.b.normalize(_absoluteXZ.c, _absoluteXZ.d);
+        _absoluteXZ.c.normalize();
     }
 
-    _pos = isometry.origin();
+    _absoluteOriginXZ = absoluteXZ.origin();
+
     updateMatrix(origin);
 
     faces.initialize();
     edges.initialize();
 }
 
-Chunk::~Chunk() { join(); delete _blob; faces.free(); edges.free(); }
+WorldTile::~WorldTile() { join(); delete _vxl; faces.free(); edges.free(); }
 
-bool Chunk::walkable(int X, Real y, int Z) {
+bool WorldTile::walkable(int X, Real y, int Z) {
     using namespace Fundamentals;
 
     if (sizeTileX <= X || sizeTileZ <= Z) return true;
@@ -248,7 +249,7 @@ template<typename T> inline Parallelogram<T> parallelogram(int X, int Z) {
 void drawNode(FaceShader::VAO & vao, Cube & C, Mask m, int X, int Y, int Z)
 { drawRightParallelogrammicPrism(vao, C, m, GLfloat(Y), 1.0f, parallelogram<GLfloat>(X, Z)); }
 
-void Chunk::emitFaces(NodeRegistry & nodeRegistry) {
+void WorldTile::emitFaces(NodeRegistry & nodeRegistry) {
     using namespace Fundamentals;
 
     faces.clear();
@@ -307,7 +308,7 @@ inline void emitLine(EdgeShader::VAO & vao, vec3 && v1, vec3 && v2) {
     vao.push(); vao.emit(v2);
 }
 
-void Chunk::emitEdges(NodeRegistry &) {
+void WorldTile::emitEdges(NodeRegistry &) {
     using namespace Fundamentals;
 
     using namespace Tesselation;
@@ -348,7 +349,7 @@ void Chunk::emitEdges(NodeRegistry &) {
     }
 }
 
-void Chunk::refresh(NodeRegistry & nodeRegistry) {
+void WorldTile::refresh(NodeRegistry & nodeRegistry) {
     if (needUpdateVAO) {
         facesOffsetY.flip();
         edgesLowerOffsetY.flip();
@@ -373,22 +374,22 @@ void Chunk::refresh(NodeRegistry & nodeRegistry) {
     });
 }
 
-void Chunk::updateMatrix(const Fuchsian<Integer> & origin) {
-    _domain = (origin.inverse() * _isometry).field<Real>();
-    _domain.normalize();
+void WorldTile::updateMatrix(const Fuchsian<Integer> & origin) {
+    _cameraXZ = (origin.inverse() * _absoluteXZ).field<Real>();
+    _cameraXZ.normalize();
 
-    _awayness = _domain.origin().abs();
+    _cameraVerticalDistance = _cameraXZ.origin().abs();
 }
 
 template<ShaderSpec Spec>
-inline void uploadDomain(Chunk * chunk, ShaderProgram<Spec> * shader) {
-    shader->uniform("cameraTileXZ.a", chunk->domain().a);
-    shader->uniform("cameraTileXZ.b", chunk->domain().b);
-    shader->uniform("cameraTileXZ.c", chunk->domain().c);
-    shader->uniform("cameraTileXZ.d", chunk->domain().d);
+inline void uploadDomain(WorldTile * tile, ShaderProgram<Spec> * shader) {
+    shader->uniform("cameraTileXZ.a", tile->cameraXZ().a);
+    shader->uniform("cameraTileXZ.b", tile->cameraXZ().b);
+    shader->uniform("cameraTileXZ.c", tile->cameraXZ().c);
+    shader->uniform("cameraTileXZ.d", tile->cameraXZ().d);
 }
 
-void Chunk::renderFaces(FaceShader * shader, int Y₁, int Y₂) {
+void WorldTile::renderFaces(FaceShader * shader, int Y₁, int Y₂) {
     // We assume that Y₂ − Y₁ ≥ sizeTileY and [Y₁; Y₂] ∩ [0; sizeTileY] ≠ ø.
 
     using namespace Fundamentals;
@@ -413,7 +414,7 @@ void Chunk::renderFaces(FaceShader * shader, int Y₁, int Y₂) {
     }
 }
 
-void Chunk::renderEdges(EdgeShader * shader, int Y₁, int Y₂) {
+void WorldTile::renderEdges(EdgeShader * shader, int Y₁, int Y₂) {
     using namespace Fundamentals;
 
     uploadDomain(this, shader);
@@ -436,7 +437,7 @@ void Chunk::renderEdges(EdgeShader * shader, int Y₁, int Y₂) {
     }
 }
 
-bool Chunk::touch(const Gyrovector<Real> & w, int X, int Z) {
+bool WorldTile::touch(const Gyrovector<Real> & w, int X, int Z) {
     const auto & A = Tesselation::corners[X + 0][Z + 0];
     const auto & B = Tesselation::corners[X + 1][Z + 0];
     const auto & C = Tesselation::corners[X + 1][Z + 1];
@@ -450,10 +451,10 @@ bool Chunk::touch(const Gyrovector<Real> & w, int X, int Z) {
     );
 }
 
-std::pair<int, int> Chunk::round(const Gyrovector<Real> & w)
+std::pair<int, int> WorldTile::round(const Gyrovector<Real> & w)
 { return Tesselation::unapply(w.x(), w.y()); }
 
-bool Chunk::isInsideOfDomain(const Gyrovector<Real> & w₀) {
+bool WorldTile::isInsideOfDomain(const Gyrovector<Real> & w₀) {
     using namespace Fundamentals;
 
     // We are using symmetry of grid along axes here
@@ -470,41 +471,41 @@ bool Chunk::isInsideOfDomain(const Gyrovector<Real> & w₀) {
     return false;
 }
 
-std::optional<size_t> Chunk::matchNeighbour(const Gyrovector<Real> & P) {
+std::optional<size_t> WorldTile::matchNeighbour(const Gyrovector<Real> & P) {
     for (size_t k = 0; k < Tesselation::neighbours.size(); k++) {
         const auto & Δ⁻¹ = Tesselation::neighbours⁻¹[k];
-        if (Chunk::isInsideOfDomain(Δ⁻¹.apply(P)))
+        if (WorldTile::isInsideOfDomain(Δ⁻¹.apply(P)))
             return std::optional(k);
     }
 
     return std::nullopt;
 }
 
-Atlas::Atlas() {}
-Atlas::~Atlas() {}
+WorldMap::WorldMap() {}
+WorldMap::~WorldMap() {}
 
-Chunk * Atlas::lookup(const Gaussian²<Integer> & pos) {
-    for (auto chunk : pool)
-        if (chunk->pos() == pos)
-            return chunk;
+WorldTile * WorldMap::lookup(const Gaussian²<Integer> & absoluteOriginXZ) {
+    for (auto tile : pool)
+        if (tile->absoluteOriginXZ() == absoluteOriginXZ)
+            return tile;
 
     return nullptr;
 }
 
-Chunk * Atlas::poll(const Fuchsian<Integer> & origin, const Fuchsian<Integer> & isometry) {
-    auto pos = isometry.origin();
+WorldTile * WorldMap::poll(const Fuchsian<Integer> & origin, const Fuchsian<Integer> & absoluteXZ) {
+    auto absoluteOriginXZ = absoluteXZ.origin();
 
-    for (auto chunk : pool)
-        if (chunk->pos() == pos)
-            return chunk;
+    for (auto tile : pool)
+        if (tile->absoluteOriginXZ() == absoluteOriginXZ)
+            return tile;
 
-    auto chunk = new Chunk(origin, isometry); pool.push_back(chunk);
-    chunk->load(generator, engine); return chunk;
+    auto tile = new WorldTile(origin, absoluteXZ); pool.push_back(tile);
+    tile->load(mapgen, engine); return tile;
 }
 
-void Atlas::updateMatrix(const Fuchsian<Integer> & origin) {
-    for (auto chunk : pool)
-        chunk->updateMatrix(origin);
+void WorldMap::updateMatrix(const Fuchsian<Integer> & origin) {
+    for (auto tile : pool)
+        tile->updateMatrix(origin);
 }
 
 const char * initcmd   = "CREATE TABLE IF NOT EXISTS atlas("
@@ -516,7 +517,7 @@ const char * initcmd   = "CREATE TABLE IF NOT EXISTS atlas("
 inline void warn(sqlite3 * engine)
 { std::fprintf(stderr, "SQLITE: %s\n", sqlite3_errmsg(engine)); }
 
-void Atlas::connect(std::string & filename) {
+void WorldMap::connect(std::string & filename) {
     auto retval = sqlite3_open(filename.c_str(), &engine);
 
     if (retval != SQLITE_OK) {
@@ -533,22 +534,22 @@ void Atlas::connect(std::string & filename) {
     }
 }
 
-void Atlas::disconnect() {
+void WorldMap::disconnect() {
     dump();
 
-    for (auto chunk : pool)
-        chunk->join();
+    for (auto tile : pool)
+        tile->join();
 
     sqlite3_close(engine);
 }
 
-inline void dumpBlob(sqlite3_stmt * statement, int index, void * blob, size_t n) {
+inline void dumpBlob(sqlite3_stmt * statement, int index, void * src, size_t n) {
     static uint8_t zero = 0;
 
-    if (blob == nullptr || n == 0)
+    if (src == nullptr || n == 0)
         sqlite3_bind_blob(statement, index, &zero, 1, SQLITE_STATIC);
     else
-        sqlite3_bind_blob(statement, index, blob, n, free);
+        sqlite3_bind_blob(statement, index, src, n, free);
 }
 
 void dumpGaussian(sqlite3_stmt * statement, const Gaussian<Integer> & z, int idx₁, int idx₂) {
@@ -561,25 +562,25 @@ void dumpGaussian(sqlite3_stmt * statement, const Gaussian<Integer> & z, int idx
     dumpBlob(statement, idx₂, blob₂, k₂);
 }
 
-void Chunk::serialize(sqlite3_stmt * statement, int idx₀, int idx₁, int idx₂, int idx₃, int idx₄) {
+void WorldTile::serialize(sqlite3_stmt * statement, int idx₀, int idx₁, int idx₂, int idx₃, int idx₄) {
     Bitfield<uint8_t> bitfield(0);
 
-    bitfield.set(0, Math::isNeg(_pos.first.real));
-    bitfield.set(1, Math::isNeg(_pos.first.imag));
-    bitfield.set(2, Math::isNeg(_pos.second.real));
-    bitfield.set(3, Math::isNeg(_pos.second.imag));
+    bitfield.set(0, Math::isNeg(_absoluteOriginXZ.first.real));
+    bitfield.set(1, Math::isNeg(_absoluteOriginXZ.first.imag));
+    bitfield.set(2, Math::isNeg(_absoluteOriginXZ.second.real));
+    bitfield.set(3, Math::isNeg(_absoluteOriginXZ.second.imag));
 
     sqlite3_bind_int(statement, idx₀, uint8_t(bitfield));
-    dumpGaussian(statement, _pos.first,  idx₁, idx₂);
-    dumpGaussian(statement, _pos.second, idx₃, idx₄);
+    dumpGaussian(statement, _absoluteOriginXZ.first,  idx₁, idx₂);
+    dumpGaussian(statement, _absoluteOriginXZ.second, idx₃, idx₄);
 }
 
-void Chunk::load(ChunkOperator * generator, sqlite3 * engine) {
+void WorldTile::load(WorldMapgen * mapgen, sqlite3 * engine) {
     sqlite3_stmt * statement = nullptr;
 
     if (_ready) return; _working = true;
-    worker = std::async(std::launch::async, [statement, retval = 0, generator, engine, this]() mutable {
-        _blob = new Blob();
+    worker = std::async(std::launch::async, [statement, retval = 0, mapgen, engine, this]() mutable {
+        _vxl = new WorldTileData();
 
         retval = sqlite3_prepare_v2(engine, loadcmd, -1, &statement, nullptr);
         if (retval != SQLITE_OK) { warn(engine); _needUnload = true; goto fin; }
@@ -588,8 +589,8 @@ void Chunk::load(ChunkOperator * generator, sqlite3 * engine) {
         retval = sqlite3_step(statement);
 
         if (retval == SQLITE_ROW)
-            memcpy(_blob, sqlite3_column_blob(statement, 0), sizeof(Blob));
-        else { if (generator != nullptr) (*generator)(this); _dirty = true; }
+            memcpy(_vxl, sqlite3_column_blob(statement, 0), sizeof(WorldTileData));
+        else { if (mapgen != nullptr) (*mapgen)(this); _dirty = true; }
 
         if (retval == SQLITE_ERROR) warn(engine);
         sqlite3_finalize(statement); requestRefresh();
@@ -598,9 +599,9 @@ void Chunk::load(ChunkOperator * generator, sqlite3 * engine) {
     });
 }
 
-void Chunk::join() { worker.wait(); }
+void WorldTile::join() { worker.wait(); }
 
-void Chunk::dump(sqlite3 * engine) {
+void WorldTile::dump(sqlite3 * engine) {
     sqlite3_stmt * statement = nullptr;
 
     if (working()) return; _working = true;
@@ -609,7 +610,7 @@ void Chunk::dump(sqlite3 * engine) {
         if (retval != SQLITE_OK) { warn(engine); _working = false; return; }
 
         serialize(statement, 1, 2, 3, 4, 5);
-        sqlite3_bind_blob(statement, 6, _blob, sizeof(Blob), SQLITE_TRANSIENT);
+        sqlite3_bind_blob(statement, 6, _vxl, sizeof(WorldTileData), SQLITE_TRANSIENT);
 
         retval = sqlite3_step(statement);
 
@@ -618,8 +619,8 @@ void Chunk::dump(sqlite3 * engine) {
     });
 }
 
-void Atlas::dump() {
-    for (auto chunk : pool)
-        if (chunk->dirty())
-            chunk->dump(engine);
+void WorldMap::dump() {
+    for (auto tile : pool)
+        if (tile->dirty())
+            tile->dump(engine);
 }

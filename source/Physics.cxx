@@ -1,26 +1,26 @@
 #include <Hyper/Physics.hxx>
 
 std::pair<Position, bool> Position::move(const Gyrovector<Real> & v) const {
-    auto P = _domain * Aut𝔻<Real>(v); P.normalize();
+    auto P = _relativeXZ * Aut𝔻<Real>(v); P.normalize();
 
     auto w = P.origin();
 
-    if (Chunk::isInsideOfDomain(w))
-        return std::pair(Position(P, _action, _center), false);
+    if (WorldTile::isInsideOfDomain(w))
+        return std::pair(Position(P, _absoluteXZ, _absoluteOriginXZ), false);
 
-    if (auto k = Chunk::matchNeighbour(w)) {
+    if (auto k = WorldTile::matchNeighbour(w)) {
         const auto & Δ   = Tesselation::neighbours[*k];
         const auto & Δ⁻¹ = Tesselation::neighbours⁻¹[*k];
 
-        return std::pair(Position(Δ⁻¹ * P, _action * Δ), true);
+        return std::pair(Position(Δ⁻¹ * P, _absoluteXZ * Δ), true);
     }
 
     return std::pair(*this, false);
 }
 
-std::pair<int, int> Position::round(const Chunk * C) const {
-    auto Q = (C->isometry().inverse() * _action).field<Real>() * Möbius<Real>(_domain);
-    return Chunk::round(Q.origin());
+std::pair<int, int> Position::round(const WorldTile * C) const {
+    auto Q = (C->absoluteXZ().inverse() * _absoluteXZ).field<Real>() * Möbius<Real>(_relativeXZ);
+    return WorldTile::round(Q.origin());
 }
 
 void Object::rotate(const Real Δyaw, const Real Δpitch, const Real Δroll) {
@@ -47,7 +47,7 @@ vec3 Object::right() const {
     );
 }
 
-bool Entity::stuck(Chunk * C, int X, Real y, int Z) {
+bool Entity::stuck(WorldTile * C, int X, Real y, int Z) {
     if (flymode && noclip) return false;
 
     if (C == nullptr || !C->ready()) return false;
@@ -61,11 +61,11 @@ bool Entity::stuck(Chunk * C, int X, Real y, int Z) {
     return false;
 }
 
-bool Entity::stuck() { return stuck(_chunk, _X, _camera.climb, _Z); }
+bool Entity::stuck() { return stuck(_tile, _X, _camera.climb, _Z); }
 
 bool Entity::moveHorizontally(const Gyrovector<Real> & v, const Real dt) {
-    auto [P, chunkChanged] = _camera.position.move(v.scale(dt));
-    auto C = chunkChanged ? atlas()->poll(_camera.position.action(), P.action()) : chunk();
+    auto [P, isTileChanged] = _camera.position.move(v.scale(dt));
+    auto C = isTileChanged ? map()->poll(_camera.position.absoluteXZ(), P.absoluteXZ()) : tile();
 
     if (C != nullptr) {
         if (!C->ready()) return false;
@@ -75,11 +75,11 @@ bool Entity::moveHorizontally(const Gyrovector<Real> & v, const Real dt) {
         _X = X; _Z = Z;
     }
 
-    _chunk = C; _camera.position = P; return chunkChanged;
+    _tile = C; _camera.position = P; return isTileChanged;
 }
 
 bool Entity::moveVertically(const Real dt) {
-    if (!_chunk->ready()) return false;
+    if (!_tile->ready()) return false;
 
     /*
         Lorentz factor: γ(v) = 1/√(1 − v²/c²).
@@ -117,9 +117,9 @@ bool Entity::moveVertically(const Real dt) {
 
     if (jumped) { roc += jumpSpeed; jumped = false; }
 
-    auto Y = Chunk::clamp(_camera.climb + dt * roc);
+    auto Y = WorldTile::clamp(_camera.climb + dt * roc);
 
-    if (stuck(_chunk, _X, Y, _Z)) { _camera.roc = 0; _camera.flying = false; }
+    if (stuck(_tile, _X, Y, _Z)) { _camera.roc = 0; _camera.flying = false; }
     else { _camera.climb = Y; _camera.roc = roc; _camera.flying = true; }
 
     return false;
@@ -130,5 +130,5 @@ bool Entity::move(const Gyrovector<Real> & v, Real dt)
 
 void Entity::teleport(const Position & P, const Real climb) {
     _camera.climb = climb; _camera.position = P;
-    _chunk = _atlas->poll(P.action(), P.action());
+    _tile = _map->poll(P.absoluteXZ(), P.absoluteXZ());
 }

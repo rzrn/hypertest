@@ -49,7 +49,7 @@ void drawAim(DummyShader::VAO & vao) {
 
 void updateHotbar() {}
 
-Real chunkDiameter(const Real n) {
+Real worldTileDiameter(const Real n) {
     using namespace Fundamentals;
 
     constexpr Gyrovector<Real> i(D½, 0), j(0, D½), k = Coadd(i, j);
@@ -84,18 +84,20 @@ vec3 trace(const glm::mat4 & view, const glm::mat4 & projection, const GLfloat z
     return (dist / dist₀) * (v - v₀) + v₀;
 }
 
-std::optional<std::pair<Chunk *, Gyrovector<Real>>> getNeighbour(const Gyrovector<Real> & P) {
-    if (Chunk::isInsideOfDomain(P)) {
-        auto Q = Game::player.chunk()->domain().inverse().apply(P);
-        return std::optional(std::pair(Game::player.chunk(), Q));
+std::optional<std::pair<WorldTile *, Gyrovector<Real>>> getNeighbour(const Gyrovector<Real> & P) {
+    using namespace Game;
+
+    if (WorldTile::isInsideOfDomain(P)) {
+        auto Q = player.tile()->cameraXZ().inverse().apply(P);
+        return std::optional(std::pair(player.tile(), Q));
     }
 
     for (size_t k = 0; k < Tesselation::neighbours.size(); k++) {
-        auto G = Game::player.chunk()->isometry() * Tesselation::neighbours[k];
-        if (auto C = Game::atlas.lookup(G.origin())) {
-            auto Q = C->domain().inverse().apply(P);
+        auto G = player.tile()->absoluteXZ() * Tesselation::neighbours[k];
+        if (auto C = map.lookup(G.origin())) {
+            auto Q = C->cameraXZ().inverse().apply(P);
 
-            if (Chunk::isInsideOfDomain(Q))
+            if (WorldTile::isInsideOfDomain(Q))
                 return std::optional(std::pair(C, Q));
         }
     }
@@ -103,14 +105,14 @@ std::optional<std::pair<Chunk *, Gyrovector<Real>>> getNeighbour(const Gyrovecto
     return std::nullopt;
 }
 
-void setBlock(Chunk * C, int X, Real y, int Z, NodeId id) {
+void setBlock(WorldTile * C, int X, Real y, int Z, NodeId id) {
     if (C == nullptr || !C->ready())
         return;
 
     if (Fundamentals::maxTileX < X || Fundamentals::maxTileZ < Z)
         return;
 
-    int Y = std::floor(Chunk::clamp(y));
+    int Y = std::floor(WorldTile::clamp(y));
 
     if (id != 0 && C->get(X, Y, Z).id != 0)
         return;
@@ -132,7 +134,7 @@ void click(const Aut𝔻<Real> & origin, const GLfloat zbuffer, const Action act
 
     if (P.abs() <= maxₕ && fabs(v.y - y₀) <= maxᵥ) {
         if (auto ret = getNeighbour(origin.inverse().apply(P))) {
-            auto [C, Q] = *ret; auto [i, k] = Chunk::round(Q);
+            auto [C, Q] = *ret; auto [i, k] = WorldTile::round(Q);
 
             if (action == Action::Place && Game::activeSlot < Game::hotbarSize) {
                 auto id = Game::hotbar[Game::activeSlot];
@@ -148,17 +150,17 @@ void click(const Aut𝔻<Real> & origin, const GLfloat zbuffer, const Action act
 void pollNeighbours() {
     using namespace Game;
 
-    atlas.updateMatrix(player.camera().position.action());
+    map.updateMatrix(player.camera().position.absoluteXZ());
 
     for (size_t k = 0; k < Tesselation::neighbours.size(); k++) {
-        auto G = player.chunk()->isometry() * Tesselation::neighbours[k];
-        atlas.poll(player.camera().position.action(), G);
+        auto G = player.tile()->absoluteXZ() * Tesselation::neighbours[k];
+        map.poll(player.camera().position.absoluteXZ(), G);
     }
 
     /*for (size_t i = 0; i < Tesselation::neighbours.size(); i++)
         for (size_t j = 0; j < Tesselation::neighbours.size(); j++) {
-            auto G = player.chunk()->isometry() * Tesselation::neighbours[i] * Tesselation::neighbours[j];
-            atlas.poll(player.camera().position.action(), G);
+            auto G = player.tile()->absoluteXZ() * Tesselation::neighbours[i] * Tesselation::neighbours[j];
+            map.poll(player.camera().position.absoluteXZ(), G);
     }*/
 }
 
@@ -197,26 +199,26 @@ void display(GLFWwindow * window, Config & config) {
     auto n = std::polar(1.0, -player.camera().yaw);
     Gyrovector<Real> velocity(player.walkSpeed * dir * n);
 
-    bool chunkChanged = move(player, velocity, dt);
-    if (chunkChanged) pollNeighbours();
+    bool isTileChanged = move(player, velocity, dt);
+    if (isTileChanged) pollNeighbours();
 
-    for (auto it = atlas.pool.begin(); it != atlas.pool.end();) {
-        auto chunk = *it;
+    for (auto it = map.pool.begin(); it != map.pool.end();) {
+        auto tile = *it;
 
-        if (!chunk->ready()) { it++; continue; }
+        if (!tile->ready()) { it++; continue; }
 
-        if (chunk->needRefresh())
-            chunk->refresh(Registry::node);
+        if (tile->needRefresh())
+            tile->refresh(Registry::node);
 
-        if (Render::hmax < chunk->awayness())
-            chunk->unload();
+        if (Render::hmax < tile->cameraVerticalDistance())
+            tile->unload();
 
-        if (chunk->needUnload() && !chunk->dirty()) {
-            delete chunk; it = atlas.pool.erase(it);
+        if (tile->needUnload() && !tile->dirty()) {
+            delete tile; it = map.pool.erase(it);
         } else it++;
     }
 
-    auto origin = player.camera().position.domain().inverse();
+    auto origin = player.camera().position.relativeXZ().inverse();
 
     if (Mouse::grabbed) {
         glfwGetCursorPos(window, &Mouse::xpos, &Mouse::ypos);
@@ -254,18 +256,18 @@ void display(GLFWwindow * window, Config & config) {
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(1.0, 1.0);
 
-    for (auto & chunk : atlas.pool)
-        if (chunk->ready())
-            chunk->renderFaces(faceShader, Y₁, Y₂);
+    for (auto & tile : map.pool)
+        if (tile->ready())
+            tile->renderFaces(faceShader, Y₁, Y₂);
 
     glDisable(GL_POLYGON_OFFSET_FILL);
 
     edgeShader->activate();
     uploadMVP(edgeShader, origin, cameraY);
 
-    for (auto & chunk : atlas.pool)
-        if (chunk->ready())
-            chunk->renderEdges(edgeShader, Y₁, Y₂);
+    for (auto & tile : map.pool)
+        if (tile->ready())
+            tile->renderEdges(edgeShader, Y₁, Y₂);
 
     if (auto value = pbo.read(Window::width/2 - 1, Window::height/2))
     { auto [zbuffer, action] = *value; click(origin, zbuffer, action); }
@@ -281,7 +283,7 @@ void display(GLFWwindow * window, Config & config) {
     aimVao.draw(GL_LINES);
 
     if (saveTimer >= saveInterval)
-    { atlas.dump(); saveTimer = 0; }
+    { map.dump(); saveTimer = 0; }
 }
 
 void setupSheet() {
@@ -338,35 +340,35 @@ void windowFocusCallback(GLFWwindow * window, int focused) {
     if (!Window::focused) freeMouse(window);
 }
 
-Blob blobBuffer;
+WorldTileData tileBuffer;
 
-void copyBlob() {
+void copyTile() {
     using namespace Game;
 
-    const auto & src = *player.chunk();
-    if (src.blob() == nullptr) return;
+    const auto & src = *player.tile();
+    if (src.vxl() == nullptr) return;
 
-    memcpy(&blobBuffer, src.blob(), sizeof(Blob));
+    memcpy(&tileBuffer, src.vxl(), sizeof(WorldTileData));
 }
 
-void pasteBlob() {
+void pasteTile() {
     using namespace Game;
 
-    auto dest = player.chunk()->blob();
+    auto dest = player.tile()->vxl();
     if (dest == nullptr) return;
 
-    memcpy(dest, &blobBuffer, sizeof(Blob));
-    player.chunk()->requestRefresh();
+    memcpy(dest, &tileBuffer, sizeof(WorldTileData));
+    player.tile()->requestRefresh();
 }
 
-void rotateBlob() {
+void rotateTile() {
     using namespace Game;
     using namespace Fundamentals;
 
-    auto src = player.chunk()->blob();
+    auto src = player.tile()->vxl();
     if (src == nullptr) return;
 
-    auto buf = new Blob; memcpy(buf, src, sizeof(Blob));
+    auto buf = new WorldTileData; memcpy(buf, src, sizeof(WorldTileData));
 
     static_assert(sizeTileX == sizeTileZ);
 
@@ -377,7 +379,7 @@ void rotateBlob() {
 
     delete buf;
 
-    player.chunk()->requestRefresh();
+    player.tile()->requestRefresh();
 }
 
 const Real elevationRate = 3.0;
@@ -449,9 +451,9 @@ void keyboardCallback(GLFWwindow * window, int key, int scancode, int action, in
         case GLFW_KEY_7:          hotbarSelect(6);     break;
         case GLFW_KEY_8:          hotbarSelect(7);     break;
         case GLFW_KEY_9:          hotbarSelect(8);     break;
-        case GLFW_KEY_X:          rotateBlob();        break;
-        case GLFW_KEY_C:          copyBlob();          break;
-        case GLFW_KEY_V:          pasteBlob();         break;
+        case GLFW_KEY_X:          rotateTile();        break;
+        case GLFW_KEY_C:          copyTile();          break;
+        case GLFW_KEY_V:          pasteTile();         break;
         case GLFW_KEY_BACKSLASH:  freeMouse(window);   break;
         case GLFW_KEY_SPACE:      pressSpace();        break;
         case GLFW_KEY_LEFT_SHIFT: pressLShift();       break;
@@ -639,12 +641,12 @@ void setupGL(GLFWwindow * window, Config & config) {
     pbo.initialize();
 }
 
-void buildFloor(Chunk * chunk) {
+void buildFloor(WorldTile * C) {
     using namespace Fundamentals;
 
     /*for (int X = 0; X < sizeTileX; X++)
         for (int Z = 0; Z < sizeTileZ; Z++)
-            chunk->set(X, 0, Z, {1});*/
+            C->set(X, 0, Z, {1});*/
 
     Node node = {1};
 
@@ -652,16 +654,16 @@ void buildFloor(Chunk * chunk) {
         for (int X = 0; X < sizeTileX; X++) for (int Z = 0; Z < sizeTileZ; Z++) {
             int H = abs(Z - sizeTileZ / 2) < 4 ? X : 0;
 
-            chunk->set(X, Y + H, Z, node);
-            if (Y + H < maxTileY) chunk->set(X, Y + H + 1, Z, node);
+            C->set(X, Y + H, Z, node);
+            if (Y + H < maxTileY) C->set(X, Y + H + 1, Z, node);
         }
     }
 
     for (int Y = 0; Y <= sizeTileY; Y++) {
-        chunk->set(0,        Y, 0,        node);
-        chunk->set(0,        Y, maxTileZ, node);
-        chunk->set(maxTileX, Y, 0,        node);
-        chunk->set(maxTileX, Y, maxTileZ, node);
+        C->set(0,        Y, 0,        node);
+        C->set(0,        Y, maxTileZ, node);
+        C->set(maxTileX, Y, 0,        node);
+        C->set(maxTileX, Y, maxTileZ, node);
     }
 }
 
@@ -669,15 +671,15 @@ void setupGame(Config & config) {
     using namespace Tesselation;
     using namespace Game;
 
-    atlas.generator = &buildFloor;
+    map.mapgen = &buildFloor;
 
     Render::vmax = config.camera.verticalRenderDistance;
-    Render::hmax = chunkDiameter(config.camera.horizontalRenderDistance);
+    Render::hmax = worldTileDiameter(config.camera.horizontalRenderDistance);
 
-    atlas.poll(Tesselation::I, Tesselation::I);
+    map.poll(Tesselation::I, Tesselation::I);
 
     for (std::size_t k = 0; k < Tesselation::neighbours.size(); k++)
-        atlas.poll(Tesselation::I, Tesselation::neighbours[k]);
+        map.poll(Tesselation::I, Tesselation::neighbours[k]);
 
     player.teleport(Position(), 4);
 }
@@ -709,7 +711,7 @@ int main(int argc, char * argv[]) {
     for (int i = 1; i < argc; i++)
         luajit.go(argv[i]);
 
-    atlas.connect(config.world);
+    map.connect(config.world);
     setupGame(config);
     setupSheet();
 
@@ -723,7 +725,7 @@ int main(int argc, char * argv[]) {
         glfwPollEvents();
     }
 
-    atlas.disconnect();
+    map.disconnect();
     cleanUp(window);
 
     return 0;

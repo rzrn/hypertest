@@ -100,13 +100,13 @@ public:
     inline bool has(NodeId id) { return id < table.size(); }
 };
 
-struct Blob {
+struct WorldTileData {
     Node data[Fundamentals::sizeTileX][Fundamentals::sizeTileY][Fundamentals::sizeTileZ];
 
-    Blob() : data{} {}
+    WorldTileData() : data{} {}
 } __attribute__((packed));
 
-class Chunk; using ChunkOperator = void(Chunk *);
+class WorldTile; using WorldMapgen = void(WorldTile *);
 
 enum : unsigned int {
     NONE = 0u,
@@ -119,10 +119,12 @@ enum : unsigned int {
     ZALL = ZMIN | ZMAX,
 };
 
-class Chunk {
+class WorldTile {
 private:
-    Fuchsian<Integer> _isometry; Möbius<Real> _domain; Real _awayness; // used for drawing
-    Gaussian²<Integer> _pos; // used for indexing, should be equal to `isometry.origin()`
+    // These are for drawing, where `_cameraVerticalDistance` is used to track tiles that are to be unloaded
+    Möbius<Real> _cameraXZ; Real _cameraVerticalDistance;
+    // These are for indexing, where `_absoluteOriginXZ` is equal to `_absoluteXZ.origin()`
+    Fuchsian<Integer> _absoluteXZ; Gaussian²<Integer> _absoluteOriginXZ;
 
     bool _working = false; std::future<void> worker;
     FaceShader::VAO faces; EdgeShader::VAO edges;
@@ -134,12 +136,12 @@ private:
 
     bool _ready = false, _dirty = false, _needRefresh = false, _needUnload = false, needUpdateVAO = false;
 
-    Blob * _blob = nullptr;
+    WorldTileData * _vxl = nullptr;
+
 public:
+    WorldTile(const Fuchsian<Integer> & origin, const Fuchsian<Integer> &);
 
-    Chunk(const Fuchsian<Integer> & origin, const Fuchsian<Integer> & isometry);
-
-    ~Chunk();
+    ~WorldTile();
 
     void emitFaces(NodeRegistry &);
     void emitEdges(NodeRegistry &);
@@ -153,7 +155,7 @@ public:
     bool walkable(int, Real, int);
 
     void serialize(sqlite3_stmt *, int, int, int, int, int);
-    void load(ChunkOperator *, sqlite3 *);
+    void load(WorldMapgen *, sqlite3 *);
     void dump(sqlite3 *);
     void join();
 
@@ -167,14 +169,14 @@ public:
     inline constexpr void unload()         { _needUnload = true;  }
     inline constexpr auto requestRefresh() { _needRefresh = true; }
 
-    inline constexpr auto awayness() const { return _awayness; }
+    inline const auto cameraXZ()               const { return _cameraXZ;               }
+    inline const auto cameraVerticalDistance() const { return _cameraVerticalDistance; }
 
-    inline const auto isometry() const { return _isometry; }
-    inline const auto domain()   const { return _domain;   }
-    inline const auto pos()      const { return _pos;      }
+    inline const auto absoluteXZ()       const { return _absoluteXZ;       }
+    inline const auto absoluteOriginXZ() const { return _absoluteOriginXZ; }
 
-    inline Blob * blob() { if (_blob != nullptr) _dirty = true; return _blob; }
-    inline const Blob * blob() const { return _blob; }
+    inline WorldTileData * vxl() { if (_vxl != nullptr) _dirty = true; return _vxl; }
+    inline const WorldTileData * vxl() const { return _vxl; }
 
     static inline int mod(int a, int b) { int r = a % b; return r < 0 ? r + b : r; }
 
@@ -204,11 +206,11 @@ public:
             Y = mod(Y, sizeTileY);
         }
 
-        return _blob->data[X][Y][Z];
+        return _vxl->data[X][Y][Z];
     }
 
     inline void set(int X, int Y, int Z, const Node & node)
-    { _dirty = true; _blob->data[X][Y][Z] = node; }
+    { _dirty = true; _vxl->data[X][Y][Z] = node; }
 
     static bool touch(const Gyrovector<Real> &, int, int);
     static std::pair<int, int> round(const Gyrovector<Real> &);
@@ -220,24 +222,24 @@ public:
     { return Math::remainder<Real>(x, Fundamentals::sizeTileY); }
 };
 
-class Atlas {
+class WorldMap {
 private:
     sqlite3 * engine;
 
 public:
-    std::vector<Chunk *> pool;
-    ChunkOperator * generator = nullptr;
+    std::vector<WorldTile *> pool;
+    WorldMapgen * mapgen = nullptr;
 
-    Atlas();
-    ~Atlas();
+    WorldMap();
+    ~WorldMap();
 
     void connect(std::string &);
     void disconnect();
 
     void dump();
 
-    Chunk * poll(const Fuchsian<Integer> & origin, const Fuchsian<Integer> & isometry);
-    Chunk * lookup(const Gaussian²<Integer> &);
+    WorldTile * poll(const Fuchsian<Integer> & origin, const Fuchsian<Integer> &);
+    WorldTile * lookup(const Gaussian²<Integer> &);
 
     void updateMatrix(const Fuchsian<Integer> &);
 };

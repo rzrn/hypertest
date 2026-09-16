@@ -145,9 +145,9 @@ namespace Fundamentals {
     // https://link.springer.com/book/10.1007/978-3-031-02396-5, “A Gyrovector Space Approach to Hyperbolic Geometry”
     // https://www.amazon.com/Analytic-Hyperbolic-Geometry-Einsteins-Relativity/dp/9811244103, “Analytic Hyperbolic Geometry and Albert Einstein’s Special Theory of Relativity”
 
-    constexpr Real k  = τ / 6;                                  // π/3, angle of chunk’s square
-    constexpr Real D½ = Math::sqrt(2/(Math::tan(k/2) + 1) - 1); // √(2 − √3), gyrodiagonal “half gyrolength” of chunk’s gyrosquare
-    constexpr Real L  = Math::sqrt(Math::cos(k));               // 1/√2, chunk’s side (gyro)length
+    constexpr Real k  = τ / 6;                                  // π/3, angle of tile’s square
+    constexpr Real D½ = Math::sqrt(2/(Math::tan(k/2) + 1) - 1); // √(2 − √3), gyrodiagonal “half gyrolength” of tile’s gyrosquare
+    constexpr Real L  = Math::sqrt(Math::cos(k));               // 1/√2, tile’s side (gyro)length
 
     /*
         “k = τ/6” is used because corresponding tesselation (https://en.wikipedia.org/wiki/Order-6_square_tiling)

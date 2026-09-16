@@ -7,35 +7,35 @@
 
 class Position {
 private:
-    Aut𝔻<Real>         _domain;
-    Fuchsian<Integer>  _action;
-    Gaussian²<Integer> _center;
+    Aut𝔻<Real>         _relativeXZ; // Relative to `_absoluteXZ`
+    Fuchsian<Integer>  _absoluteXZ;
+    Gaussian²<Integer> _absoluteOriginXZ;
 
 public:
-    Position() : _domain(Aut𝔻<Real>()), _action(Tesselation::I) { _center = _action.origin(); }
+    Position() : _relativeXZ(Aut𝔻<Real>()), _absoluteXZ(Tesselation::I) { _absoluteOriginXZ = _absoluteXZ.origin(); }
 
-    Position(const auto & P, const auto & G, const auto & g) : _domain(P), _action(G), _center(g) {}
-    Position(const auto & P, const auto & G) : _domain(P) { _domain.normalize(); set(G); }
+    Position(const auto & P, const auto & G, const auto & g) : _relativeXZ(P), _absoluteXZ(G), _absoluteOriginXZ(g) {}
+    Position(const auto & P, const auto & G) : _relativeXZ(P) { _relativeXZ.normalize(); set(G); }
 
-    inline const auto & center() const { return _center; }
-    inline const auto & action() const { return _action; }
+    inline constexpr const auto & relativeXZ() const { return _relativeXZ; }
 
-    inline constexpr const auto & domain() const { return _domain; }
+    inline const auto & absoluteXZ()       const { return _absoluteXZ;       }
+    inline const auto & absoluteOriginXZ() const { return _absoluteOriginXZ; }
 
     inline void set(const Aut𝔻<Real> & M, const Fuchsian<Integer> & G)
-    { _domain = M; _action = G; _center = G.origin(); }
+    { _relativeXZ = M; _absoluteXZ = G; _absoluteOriginXZ = G.origin(); }
 
     inline void set(const Fuchsian<Integer> & G)
-    { _action = G; _action.normalize(); _center = G.origin(); }
+    { _absoluteXZ = G; _absoluteXZ.normalize(); _absoluteOriginXZ = G.origin(); }
 
-    inline void set(const Aut𝔻<Real> & M) { _domain = M; }
+    inline void set(const Aut𝔻<Real> & M) { _relativeXZ = M; }
 
     // It doesn’t do anything if the speed is big enough to jump over ≥2 chunks.
     // (Of course, this can be easily fixed by iterating
     //  not only over neighbours, but it seems useless.)
     std::pair<Position, bool> move(const Gyrovector<Real> &) const;
 
-    std::pair<int, int> round(const Chunk *) const;
+    std::pair<int, int> round(const WorldTile *) const;
 };
 
 struct Object {
@@ -54,7 +54,7 @@ struct Object {
 
 class Entity {
 private:
-    int _X, _Z; Object _camera; Atlas * _atlas; Chunk * _chunk;
+    WorldMap * _map; WorldTile * _tile; int _X, _Z; Object _camera;
 
     bool jumped = false;
 
@@ -66,12 +66,12 @@ public:
 
     bool flymode = false, noclip = false;
 
-    Entity(Atlas * atlas) : _X(0), _Z(0), _atlas(atlas), _chunk(nullptr) {}
+    Entity(WorldMap * map) : _map(map), _tile(nullptr), _X(0), _Z(0) {}
 
     bool stuck();
-    bool stuck(Chunk *, int, Real, int);
+    bool stuck(WorldTile *, int, Real, int);
 
-    // Returns true iff chunk changes
+    // Returns true iff tile changes
     bool move(const Gyrovector<Real> & v, Real dt);
     void teleport(const Position &, const Real);
 
@@ -79,9 +79,9 @@ public:
     constexpr void elevate(const Real elevation) { _camera.climb += elevation; }
     constexpr void jump() { jumped = true; }
 
+    inline constexpr const auto & map()    const { return _map;    }
+    inline constexpr const auto & tile()   const { return _tile;   }
     inline constexpr const auto & camera() const { return _camera; }
-    inline constexpr const auto & atlas()  const { return _atlas;  }
-    inline constexpr const auto & chunk()  const { return _chunk;  }
 
     inline constexpr const auto & X() const { return _X; }
     inline constexpr const auto & Z() const { return _Z; }
