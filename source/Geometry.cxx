@@ -261,15 +261,12 @@ void Chunk::emitFaces(NodeRegistry & nodeRegistry) {
 
             Mask mask;
 
-            Node n₁ = Y == maxTileY ? get(X, 0,        Z) : get(X, Y + 1, Z);
-            Node n₂ = Y == 0        ? get(X, maxTileY, Z) : get(X, Y - 1, Z);
-
-            mask.top    = (n₁.id == 0);
-            mask.bottom = (n₂.id == 0);
-            mask.back   = (Z == 0)        || (get(X + 0, Y, Z - 1).id == 0);
-            mask.front  = (Z == maxTileZ) || (get(X + 0, Y, Z + 1).id == 0);
-            mask.left   = (X == 0)        || (get(X - 1, Y, Z + 0).id == 0);
-            mask.right  = (X == maxTileX) || (get(X + 1, Y, Z + 0).id == 0);
+            mask.top    = get<YALL>(X + 0, Y + 1, Z + 0).id == 0;
+            mask.bottom = get<YALL>(X + 0, Y - 1, Z + 0).id == 0;
+            mask.back   = get<ZMIN>(X + 0, Y + 0, Z - 1).id == 0;
+            mask.front  = get<ZMAX>(X + 0, Y + 0, Z + 1).id == 0;
+            mask.left   = get<XMIN>(X - 1, Y + 0, Z + 0).id == 0;
+            mask.right  = get<XMAX>(X + 1, Y + 0, Z + 0).id == 0;
 
             if (nodeRegistry.has(id)) {
                 auto nodeDef = nodeRegistry.get(id);
@@ -317,27 +314,23 @@ void Chunk::emitEdges(NodeRegistry &) {
 
     edges.clear();
 
-    Node airNode = {.id = 0}; // TODO
-
     for (int Y = 0; Y <= sizeTileY; Y++) {
         if (Y < sizeTileY) edgesLowerOffsetY[Y] = edges.eboElementCount();
 
-        // TODO: maybe it would be better for `get(...)` to wrap its arguments?
-
         for (int X = 0; X < sizeTileX; X++) for (int Z = 0; Z <= sizeTileZ; Z++) {
-            auto n₀₀ = Z == 0         ? airNode : Y == 0         ? get(X, maxTileY, Z - 1) : get(X, Y - 1, Z - 1);
-            auto n₀₁ = Z == sizeTileZ ? airNode : Y == 0         ? get(X, maxTileY, Z + 0) : get(X, Y - 1, Z + 0);
-            auto n₁₀ = Z == 0         ? airNode : Y == sizeTileY ? get(X, 0,        Z - 1) : get(X, Y + 0, Z - 1);
-            auto n₁₁ = Z == sizeTileZ ? airNode : Y == sizeTileY ? get(X, 0,        Z + 0) : get(X, Y + 0, Z + 0);
+            auto n₀₀ = get<YALL | ZMIN>(X, Y - 1, Z - 1);
+            auto n₀₁ = get<YALL | ZMAX>(X, Y - 1, Z + 0);
+            auto n₁₀ = get<YALL | ZMIN>(X, Y + 0, Z - 1);
+            auto n₁₁ = get<YALL | ZMAX>(X, Y + 0, Z + 0);
 
             if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[X][Z].v3(Y), corners[X + 1][Z].v3(Y));
         }
 
         for (int X = 0; X <= sizeTileX; X++) for (int Z = 0; Z < sizeTileZ; Z++) {
-            auto n₀₀ = X == 0         ? airNode : Y == 0         ? get(X - 1, maxTileY, Z) : get(X - 1, Y - 1, Z);
-            auto n₀₁ = X == 0         ? airNode : Y == sizeTileY ? get(X - 1, 0,        Z) : get(X - 1, Y + 0, Z);
-            auto n₁₀ = X == sizeTileX ? airNode : Y == 0         ? get(X + 0, maxTileY, Z) : get(X + 0, Y - 1, Z);
-            auto n₁₁ = X == sizeTileX ? airNode : Y == sizeTileY ? get(X + 0, 0,        Z) : get(X + 0, Y + 0, Z);
+            auto n₀₀ = get<XMIN | YALL>(X - 1, Y - 1, Z);
+            auto n₀₁ = get<XMIN | YALL>(X - 1, Y + 0, Z);
+            auto n₁₀ = get<XMAX | YALL>(X + 0, Y - 1, Z);
+            auto n₁₁ = get<XMAX | YALL>(X + 0, Y + 0, Z);
 
             if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[X][Z].v3(Y), corners[X][Z + 1].v3(Y));
         }
@@ -345,10 +338,10 @@ void Chunk::emitEdges(NodeRegistry &) {
         if (Y > 0) edgesUpperOffsetY[Y - 1] = edges.eboElementCount();
 
         if (Y < sizeTileY) for (int X = 0; X <= sizeTileX; X++) for (int Z = 0; Z <= sizeTileZ; Z++) {
-            auto n₀₀ = X == 0         || Z == 0         ? airNode : get(X - 1, Y, Z - 1);
-            auto n₀₁ = X == 0         || Z == sizeTileZ ? airNode : get(X - 1, Y, Z + 0);
-            auto n₁₀ = X == sizeTileX || Z == 0         ? airNode : get(X + 0, Y, Z - 1);
-            auto n₁₁ = X == sizeTileX || Z == sizeTileZ ? airNode : get(X + 0, Y, Z + 0);
+            auto n₀₀ = get<XMIN | ZMIN>(X - 1, Y, Z - 1);
+            auto n₀₁ = get<XMIN | ZMAX>(X - 1, Y, Z + 0);
+            auto n₁₀ = get<XMAX | ZMIN>(X + 0, Y, Z - 1);
+            auto n₁₁ = get<XMAX | ZMAX>(X + 0, Y, Z + 0);
 
             if (isEdgeVisible(n₀₀, n₀₁, n₁₀, n₁₁)) emitLine(edges, corners[X][Z].v3(Y), corners[X][Z].v3(Y + 1));
         }

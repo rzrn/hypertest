@@ -108,6 +108,17 @@ struct Blob {
 
 class Chunk; using ChunkOperator = Chunk *(Chunk *);
 
+enum : unsigned int {
+    NONE = 0u,
+    XMIN = 1u << 0,
+    XMAX = 1u << 1,
+    YALL = 1u << 2,
+    ZMIN = 1u << 3,
+    ZMAX = 1u << 4,
+    XALL = XMIN | XMAX,
+    ZALL = ZMIN | ZMAX,
+};
+
 class Chunk {
 private:
     Fuchsian<Integer> _isometry; Möbius<Real> _domain; Real _awayness; // used for drawing
@@ -165,8 +176,36 @@ public:
     inline Blob * blob() { if (_blob != nullptr) _dirty = true; return _blob; }
     inline const Blob * blob() const { return _blob; }
 
-    inline auto get(int X, int Y, int Z) const
-    { return _blob->data[X][Y][Z]; }
+    static inline int mod(int a, int b) { int r = a % b; return r < 0 ? r + b : r; }
+
+    // TODO: make this to return a reference instead
+    template<unsigned int mask = NONE> inline Node get(int X, int Y, int Z) const {
+        using namespace Fundamentals;
+
+        // Bounds checks are eliminated at compile time unless needed
+
+        if constexpr(mask & XMIN) {
+            if (X < 0) return {};
+        }
+
+        if constexpr(mask & XMAX) {
+            if (maxTileX < X) return {};
+        }
+
+        if constexpr(mask & ZMIN) {
+            if (Z < 0) return {};
+        }
+
+        if constexpr(mask & ZMAX) {
+            if (maxTileZ < Z) return {};
+        }
+
+        if constexpr(mask & YALL) {
+            Y = mod(Y, sizeTileY);
+        }
+
+        return _blob->data[X][Y][Z];
+    }
 
     inline void set(int X, int Y, int Z, const Node & node)
     { _dirty = true; _blob->data[X][Y][Z] = node; }
