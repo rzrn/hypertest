@@ -195,7 +195,7 @@ bool Chunk::walkable(int X, Real y, int Z) {
     using namespace Fundamentals;
 
     if (sizeTileX <= X || sizeTileZ <= Z) return true;
-    return get(X, int(Chunk::clamp(y)), Z).id == 0;
+    return get<YALL>(X, std::floor(y), Z).id == 0;
 }
 
 void drawParallelogram(FaceShader::VAO & vao, Texture & T, const Parallelogram<GLfloat> & P, GLfloat h) {
