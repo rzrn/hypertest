@@ -639,7 +639,7 @@ void setupGL(GLFWwindow * window, Config & config) {
     pbo.initialize();
 }
 
-Chunk * buildFloor(Chunk * chunk) {
+void buildFloor(Chunk * chunk) {
     using namespace Fundamentals;
 
     /*for (int X = 0; X < sizeTileX; X++)
@@ -663,8 +663,6 @@ Chunk * buildFloor(Chunk * chunk) {
         chunk->set(maxTileX, Y, 0,        node);
         chunk->set(maxTileX, Y, maxTileZ, node);
     }
-
-    return chunk;
 }
 
 void setupGame(Config & config) {

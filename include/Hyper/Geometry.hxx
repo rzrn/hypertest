@@ -106,7 +106,7 @@ struct Blob {
     Blob() : data{} {}
 } __attribute__((packed));
 
-class Chunk; using ChunkOperator = Chunk *(Chunk *);
+class Chunk; using ChunkOperator = void(Chunk *);
 
 enum : unsigned int {
     NONE = 0u,
