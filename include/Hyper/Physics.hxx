@@ -1,5 +1,7 @@
 #pragma once
 
+#include <glm/vec3.hpp>
+
 #include <Math/Fuchsian.hxx>
 #include <Math/AutD.hxx>
 
@@ -33,7 +35,7 @@ public:
     inline void setAbsoluteXZ(const Fuchsian<Integer> & M)
     { _absoluteXZ = M; _absoluteXZ.normalize(); _absoluteOriginXZ = M.origin(); }
 
-    inline void moveY(const Real & dy) { _absoluteY += dy; }
+    inline void moveY(const Real dy) { _absoluteY += dy; }
 
     /* It doesn’t do anything if the speed is big enough to jump over ≥2 chunks.
       (Of course, this can be easily fixed by iterating not only over neighbours,
@@ -58,11 +60,8 @@ private:
 
     bool _hasJumpedUp = false, _isAirborne = false;
 
-    bool moveHorizontally(const Gyrovector<Real> & v, const Real dt);
-    bool moveVertically(const Real dt);
-
 public:
-    Real velocityY = 0.0;
+    vec3 velocity = {0, 0, 0}; // Velocity is a tangent vector, not a gyrovector, thus `vec3`
 
     Real eye = 0.0, height = 0.0, walkSpeed = 0.0, jumpSpeed = 0.0, gravity = 0.0;
 
@@ -73,8 +72,12 @@ public:
     bool stuck();
     bool stuck(WorldTile *, int, Real, int);
 
-    bool move(const Gyrovector<Real> & v, Real dt); // Returns true iff tile changes
-    void teleport(const Position &);
+    // These return true iff the current tile changes
+    bool moveY(const Real dt);
+    bool moveXZ(const Real dt);
+    bool moveXYZ(const Real dt);
+
+    void setXYZ(const Position &);
 
     inline void jump() { _hasJumpedUp = true; }
 

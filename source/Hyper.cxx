@@ -59,11 +59,11 @@ Real worldTileDiameter(const Real n) {
     return (n * k).abs();
 }
 
-bool move(Entity & E, const Gyrovector<Real> & v, Real Δt) {
+bool fixedStepMove(Entity & E, Real Δt) {
     constexpr Real Δtₘₐₓ = 1.0/5.0; bool P = false;
 
-    while (Δt >= Δtₘₐₓ) { auto Q = E.move(v, Δtₘₐₓ); P = P || Q; Δt -= Δtₘₐₓ; }
-    auto R = E.move(v, Δt); return P || R;
+    while (Δt >= Δtₘₐₓ) { auto Q = E.moveXYZ(Δtₘₐₓ); P = P || Q; Δt -= Δtₘₐₓ; }
+    auto R = E.moveXYZ(Δt); return P || R;
 }
 
 vec3 unproject(const glm::mat4 & view, const glm::mat4 & projection, const GLfloat depth) {
@@ -200,20 +200,28 @@ void display(GLFWwindow * window, Config & config) {
         size₁ = size₂;
     }
 
-    using namespace std::complex_literals;
+    {
+        Real vx = 0, vz = 0;
 
-    auto dir = 0i;
-    if (Keyboard::forward)  dir += +1i;
-    if (Keyboard::backward) dir += -1i;
-    if (Keyboard::left)     dir += +1;
-    if (Keyboard::right)    dir += -1;
+        if (Keyboard::forward)  vz += 1.0;
+        if (Keyboard::backward) vz -= 1.0;
+        if (Keyboard::left)     vx += 1.0;
+        if (Keyboard::right)    vx -= 1.0;
 
-    if (dir != 0.0) dir /= std::abs(dir);
+        auto n = std::hypot(vx, vz);
 
-    auto n = std::polar(1.0, -camera.yaw);
-    Gyrovector<Real> velocity(player.walkSpeed * dir * n);
+        if (n > 0) {
+            vx *= player.walkSpeed / n;
+            vz *= player.walkSpeed / n;
+        }
 
-    bool isTileChanged = move(player, velocity, dt);
+        auto θ = -camera.yaw, sinθ = sin(θ), cosθ = cos(θ);
+
+        player.velocity.x = cosθ * vx - sinθ * vz;
+        player.velocity.z = sinθ * vx + cosθ * vz;
+    }
+
+    bool isTileChanged = fixedStepMove(player, dt);
     if (isTileChanged) pollNeighbours();
 
     for (auto it = map.pool.begin(); it != map.pool.end();) {
@@ -241,7 +249,7 @@ void display(GLFWwindow * window, Config & config) {
         camera.rotate(
             Mouse::speed * dt * (Window::width/2 - Mouse::xpos),
             Mouse::speed * dt * (Window::height/2 - Mouse::ypos),
-            0.0f
+            0
         );
     }
 
@@ -403,15 +411,15 @@ void rotateTile() {
 
 const Real flyVelocityY = 3.0;
 
-inline void pressLShift() { if (Game::player.flymode) Game::player.velocityY = -flyVelocityY; }
-inline void releaseLShift() { if (Game::player.flymode) Game::player.velocityY = 0; }
+inline void pressLShift() { if (Game::player.flymode) Game::player.velocity.y = -flyVelocityY; }
+inline void releaseLShift() { if (Game::player.flymode) Game::player.velocity.y = 0; }
 
 inline void pressSpace() {
-    if (Game::player.flymode) Game::player.velocityY = flyVelocityY;
+    if (Game::player.flymode) Game::player.velocity.y = flyVelocityY;
     else if (!Game::player.isAirborne()) Game::player.jump();
 }
 
-inline void releaseSpace() { if (Game::player.flymode) Game::player.velocityY = 0; }
+inline void releaseSpace() { if (Game::player.flymode) Game::player.velocity.y = 0; }
 
 inline void closeWindow(GLFWwindow * window) {
     glfwSetWindowShouldClose(window, GL_TRUE);
@@ -430,8 +438,8 @@ inline void crosshairBlink() {
 inline void returnToSpawn() {
     using namespace Game;
 
-    player.teleport(Position(5));
-    player.velocityY = 0;
+    player.setXYZ(Position(5));
+    player.velocity.y = 0;
 
     pollNeighbours();
 
@@ -441,7 +449,7 @@ inline void returnToSpawn() {
 inline void toggleFlyMode() {
     using namespace Game;
 
-    player.velocityY = 0;
+    player.velocity.y = 0;
     player.flymode = !player.flymode;
 
     crosshairBlink();
@@ -714,7 +722,7 @@ void setupGame(Config & config) {
     for (std::size_t k = 0; k < Tesselation::neighbours.size(); k++)
         map.poll(Tesselation::I, Tesselation::neighbours[k]);
 
-    player.teleport(Position(4));
+    player.setXYZ(Position(4));
 }
 
 void cleanUp(GLFWwindow * window) {

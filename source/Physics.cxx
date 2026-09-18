@@ -1,7 +1,7 @@
 #include <Hyper/Physics.hxx>
 
-bool Position::moveXZ(const Gyrovector<Real> & v) {
-    auto P = _relativeXZ * Aut𝔻<Real>(v); auto w = P.origin();
+bool Position::moveXZ(const Gyrovector<Real> & dr) {
+    auto P = _relativeXZ * Aut𝔻<Real>(dr); auto w = P.origin();
 
     if (WorldTile::isInsideOfDomain(w)) {
         setRelativeXZ(P);
@@ -64,8 +64,27 @@ bool Entity::stuck(WorldTile * C, int X, Real y, int Z) {
 
 bool Entity::stuck() { return stuck(_tile, _X, _position.absoluteY(), _Z); }
 
-bool Entity::moveHorizontally(const Gyrovector<Real> & v, const Real dt) {
-    Position P(_position); auto isTileChanged = P.moveXZ(v.scale(dt));
+inline Gyrovector<Real> exp₀(const Real x, const Real y) {
+    /* exp₀(v) converts a tangent vector v ∈ T₀(𝔻) into a gyrovector originating at z = 0.
+       [1] Hyperbolic Neural Networks, Octavian Ganea, Gary Becigneul, and Thomas Hofman,
+           Advances in Neural Information Processing System, 2018
+           https://arxiv.org/pdf/1805.09112
+       [2] Hyperbolic Neural Networks++, Ryohei Shimizu, Yusuke Mukuta, Tatsuya Harada,
+           Published as a conference paper at ICLR 2021 */
+
+    auto n = std::hypot(x, y);
+
+    if (n > 0) {
+        auto k = tanh(n) / n;
+        return {k * x, k * y};
+    } else {
+        return 0;
+    }
+}
+
+bool Entity::moveXZ(const Real dt) {
+    auto dr = exp₀(velocity.x * dt, velocity.z * dt);
+    Position P(_position); auto isTileChanged = P.moveXZ(dr);
 
     auto C = isTileChanged ? map()->poll(_position.absoluteXZ(), P.absoluteXZ()) : tile();
 
@@ -80,7 +99,7 @@ bool Entity::moveHorizontally(const Gyrovector<Real> & v, const Real dt) {
     _tile = C; _position = P; return isTileChanged;
 }
 
-bool Entity::moveVertically(const Real dt) {
+bool Entity::moveY(const Real dt) {
     if (!_tile->ready()) return false;
 
     /*
@@ -114,21 +133,21 @@ bool Entity::moveVertically(const Real dt) {
     */
     constexpr Real vmax = 32.0;
 
-    auto γ⁻² = std::clamp<Real>(1 - Math::sqr(velocityY / vmax), 0, 1);
-    auto vy = flymode ? velocityY : velocityY - dt * gravity * std::pow(γ⁻², 1.5);
+    auto γ⁻² = std::clamp<Real>(1 - Math::sqr(velocity.y / vmax), 0, 1);
+    auto vy = flymode ? velocity.y : velocity.y - dt * gravity * std::pow(γ⁻², 1.5);
 
     if (_hasJumpedUp) { vy += jumpSpeed; _hasJumpedUp = false; }
 
     auto y = WorldTile::clamp(_position.absoluteY() + dt * vy);
 
-    if (stuck(_tile, _X, y, _Z)) { velocityY = 0; _isAirborne = false; }
-    else { _position.setY(y); velocityY = vy; _isAirborne = true; }
+    if (stuck(_tile, _X, y, _Z)) { velocity.y = 0; _isAirborne = false; }
+    else { _position.setY(y); velocity.y = vy; _isAirborne = true; }
 
     return false;
 }
 
-bool Entity::move(const Gyrovector<Real> & v, Real dt)
-{ return moveHorizontally(v, dt) | moveVertically(dt); }
+bool Entity::moveXYZ(const Real dt)
+{ return moveXZ(dt) | moveY(dt); }
 
-void Entity::teleport(const Position & P)
+void Entity::setXYZ(const Position & P)
 { _position = P; _tile = _map->poll(P.absoluteXZ(), P.absoluteXZ()); }
