@@ -210,7 +210,7 @@ void display(GLFWwindow * window, Config & config) {
 
     if (dir != 0.0) dir /= std::abs(dir);
 
-    auto n = std::polar(1.0, -player.camera().yaw);
+    auto n = std::polar(1.0, -camera.yaw);
     Gyrovector<Real> velocity(player.walkSpeed * dir * n);
 
     bool isTileChanged = move(player, velocity, dt);
@@ -238,7 +238,7 @@ void display(GLFWwindow * window, Config & config) {
         glfwGetCursorPos(window, &Mouse::xpos, &Mouse::ypos);
         glfwSetCursorPos(window, Window::width/2, Window::height/2);
 
-        player.rotate(
+        camera.rotate(
             Mouse::speed * dt * (Window::width/2 - Mouse::xpos),
             Mouse::speed * dt * (Window::height/2 - Mouse::ypos),
             0.0f
@@ -247,7 +247,7 @@ void display(GLFWwindow * window, Config & config) {
 
     auto cameraY = player.position().absoluteY() + player.eye;
 
-    auto direction = player.camera().direction(), right = player.camera().right(), up = glm::cross(right, direction);
+    auto direction = camera.direction(), right = camera.right(), up = glm::cross(right, direction);
     auto eye = vec3(0.0f, -cameraY, 0.0f);
 
     view = glm::lookAt(vec3(0.0f), direction, up);

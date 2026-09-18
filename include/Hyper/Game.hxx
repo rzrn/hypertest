@@ -18,6 +18,7 @@ namespace Game {
 
     extern WorldMap map;
     extern Entity player;
+    extern Camera camera;
 
     constexpr size_t hotbarSize = 9;
     extern NodeId hotbar[hotbarSize];

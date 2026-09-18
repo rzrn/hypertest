@@ -11,6 +11,7 @@ namespace Registry {
 
 WorldMap map;
 Entity player(&map);
+Camera camera;
 
 NodeId hotbar[hotbarSize] = {0};
 size_t activeSlot = 0;

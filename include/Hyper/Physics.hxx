@@ -43,7 +43,7 @@ public:
     std::pair<int, int> round(const WorldTile *) const;
 };
 
-struct Object {
+struct Camera {
     Real yaw = 0, pitch = 0, roll = 0;
 
     void rotate(const Real, const Real, const Real);
@@ -54,7 +54,7 @@ struct Object {
 
 class Entity {
 private:
-    WorldMap * _map; WorldTile * _tile; int _X, _Z; Position _position; Object _camera;
+    WorldMap * _map; WorldTile * _tile; int _X, _Z; Position _position;
 
     bool _hasJumpedUp = false, _isAirborne = false;
 
@@ -81,7 +81,6 @@ public:
 
     inline constexpr const auto & map()      const { return _map;      }
     inline constexpr const auto & tile()     const { return _tile;     }
-    inline constexpr const auto & camera()   const { return _camera;   }
     inline constexpr const auto & position() const { return _position; }
 
     inline constexpr const auto & X() const { return _X; }
@@ -91,7 +90,4 @@ public:
 
     constexpr inline void jumpHeight(Real height)
     { jumpSpeed = sqrt(2 * gravity * height); }
-
-    inline void rotate(const Real Δyaw, const Real Δpitch, const Real Δroll)
-    { _camera.rotate(Δyaw, Δpitch, Δroll); }
 };

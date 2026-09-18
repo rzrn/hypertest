@@ -24,7 +24,7 @@ std::pair<int, int> Position::round(const WorldTile * C) const {
     return WorldTile::round(Q.origin());
 }
 
-void Object::rotate(const Real Δyaw, const Real Δpitch, const Real Δroll) {
+void Camera::rotate(const Real Δyaw, const Real Δpitch, const Real Δroll) {
     constexpr auto ε = 1e-6;
 
     yaw   = std::fmod(yaw + Δyaw, τ);
@@ -32,7 +32,7 @@ void Object::rotate(const Real Δyaw, const Real Δpitch, const Real Δroll) {
     roll  = std::fmod(roll + Δroll, τ);
 }
 
-vec3 Object::direction() const {
+vec3 Camera::direction() const {
     return vec3(
         cos(pitch) * sin(yaw),
         sin(pitch),
@@ -40,7 +40,7 @@ vec3 Object::direction() const {
     );
 }
 
-vec3 Object::right() const {
+vec3 Camera::right() const {
     return vec3(
         cos(roll) * sin(yaw - τ/4),
         sin(roll),
