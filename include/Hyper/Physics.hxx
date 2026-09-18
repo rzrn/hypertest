@@ -44,10 +44,7 @@ public:
 };
 
 struct Object {
-    Position position;
-
     Real roc = 0;
-    bool flying = false;
 
     Real yaw = 0, pitch = 0, roll = 0;
 
@@ -59,9 +56,9 @@ struct Object {
 
 class Entity {
 private:
-    WorldMap * _map; WorldTile * _tile; int _X, _Z; Object _camera;
+    WorldMap * _map; WorldTile * _tile; int _X, _Z; Position _position; Object _camera;
 
-    bool jumped = false;
+    bool _hasJumpedUp = false, _isAirborne = false;
 
     bool moveHorizontally(const Gyrovector<Real> & v, const Real dt);
     bool moveVertically(const Real dt);
@@ -80,15 +77,18 @@ public:
     void teleport(const Position &);
 
     inline void roc(const Real roc) { _camera.roc = roc; }
-    inline void elevate(const Real elevation) { _camera.position.moveY(elevation); }
-    inline void jump() { jumped = true; }
+    inline void elevate(const Real elevation) { _position.moveY(elevation); }
+    inline void jump() { _hasJumpedUp = true; }
 
-    inline constexpr const auto & map()    const { return _map;    }
-    inline constexpr const auto & tile()   const { return _tile;   }
-    inline constexpr const auto & camera() const { return _camera; }
+    inline constexpr const auto & map()      const { return _map;      }
+    inline constexpr const auto & tile()     const { return _tile;     }
+    inline constexpr const auto & camera()   const { return _camera;   }
+    inline constexpr const auto & position() const { return _position; }
 
     inline constexpr const auto & X() const { return _X; }
     inline constexpr const auto & Z() const { return _Z; }
+
+    inline const bool isAirborne() const { return _isAirborne; }
 
     constexpr inline void jumpHeight(Real height)
     { jumpSpeed = sqrt(2 * gravity * height); }

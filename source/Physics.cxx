@@ -62,22 +62,22 @@ bool Entity::stuck(WorldTile * C, int X, Real y, int Z) {
     return false;
 }
 
-bool Entity::stuck() { return stuck(_tile, _X, _camera.position.absoluteY(), _Z); }
+bool Entity::stuck() { return stuck(_tile, _X, _position.absoluteY(), _Z); }
 
 bool Entity::moveHorizontally(const Gyrovector<Real> & v, const Real dt) {
-    Position P(_camera.position); auto isTileChanged = P.moveXZ(v.scale(dt));
+    Position P(_position); auto isTileChanged = P.moveXZ(v.scale(dt));
 
-    auto C = isTileChanged ? map()->poll(_camera.position.absoluteXZ(), P.absoluteXZ()) : tile();
+    auto C = isTileChanged ? map()->poll(_position.absoluteXZ(), P.absoluteXZ()) : tile();
 
     if (C != nullptr) {
         if (!C->ready()) return false;
 
         auto [X, Z] = P.round(C);
-        if (stuck(C, X, _camera.position.absoluteY(), Z)) return false;
+        if (stuck(C, X, _position.absoluteY(), Z)) return false;
         _X = X; _Z = Z;
     }
 
-    _tile = C; _camera.position = P; return isTileChanged;
+    _tile = C; _position = P; return isTileChanged;
 }
 
 bool Entity::moveVertically(const Real dt) {
@@ -117,12 +117,12 @@ bool Entity::moveVertically(const Real dt) {
     auto γ⁻² = std::clamp<Real>(1 - Math::sqr(_camera.roc / vmax), 0, 1);
     auto roc = flymode ? _camera.roc : _camera.roc - dt * gravity * std::pow(γ⁻², 1.5);
 
-    if (jumped) { roc += jumpSpeed; jumped = false; }
+    if (_hasJumpedUp) { roc += jumpSpeed; _hasJumpedUp = false; }
 
-    auto y = WorldTile::clamp(_camera.position.absoluteY() + dt * roc);
+    auto y = WorldTile::clamp(_position.absoluteY() + dt * roc);
 
-    if (stuck(_tile, _X, y, _Z)) { _camera.roc = 0; _camera.flying = false; }
-    else { _camera.position.setY(y); _camera.roc = roc; _camera.flying = true; }
+    if (stuck(_tile, _X, y, _Z)) { _camera.roc = 0; _isAirborne = false; }
+    else { _position.setY(y); _camera.roc = roc; _isAirborne = true; }
 
     return false;
 }
@@ -130,7 +130,5 @@ bool Entity::moveVertically(const Real dt) {
 bool Entity::move(const Gyrovector<Real> & v, Real dt)
 { return moveHorizontally(v, dt) | moveVertically(dt); }
 
-void Entity::teleport(const Position & P) {
-    _camera.position = P;
-    _tile = _map->poll(P.absoluteXZ(), P.absoluteXZ());
-}
+void Entity::teleport(const Position & P)
+{ _position = P; _tile = _map->poll(P.absoluteXZ(), P.absoluteXZ()); }

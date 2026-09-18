@@ -129,7 +129,7 @@ void setBlock(WorldTile * C, int X, Real y, int Z, NodeId id) {
 
 void click(const Aut𝔻<Real> & origin, const GLfloat zbuffer, const Action action) {
     const auto maxₕ = 5.0 * Tesselation::meter, maxᵥ = 4.0;
-    const auto y₀ = Game::player.camera().position.absoluteY() + Game::player.eye;
+    const auto y₀ = Game::player.position().absoluteY() + Game::player.eye;
 
     auto v = trace(view, projection, zbuffer, y₀, action == Action::Remove);
     auto P = Gyrovector(v.x, v.z);
@@ -152,17 +152,17 @@ void click(const Aut𝔻<Real> & origin, const GLfloat zbuffer, const Action act
 void pollNeighbours() {
     using namespace Game;
 
-    map.updateMatrix(player.camera().position.absoluteXZ());
+    map.updateMatrix(player.position().absoluteXZ());
 
     for (size_t k = 0; k < Tesselation::neighbours.size(); k++) {
         auto G = player.tile()->absoluteXZ() * Tesselation::neighbours[k];
-        map.poll(player.camera().position.absoluteXZ(), G);
+        map.poll(player.position().absoluteXZ(), G);
     }
 
     /*for (size_t i = 0; i < Tesselation::neighbours.size(); i++)
         for (size_t j = 0; j < Tesselation::neighbours.size(); j++) {
             auto G = player.tile()->absoluteXZ() * Tesselation::neighbours[i] * Tesselation::neighbours[j];
-            map.poll(player.camera().position.absoluteXZ(), G);
+            map.poll(player.position().absoluteXZ(), G);
     }*/
 }
 
@@ -232,7 +232,7 @@ void display(GLFWwindow * window, Config & config) {
         } else it++;
     }
 
-    auto origin = player.camera().position.relativeXZ().inverse();
+    auto origin = player.position().relativeXZ().inverse();
 
     if (Mouse::grabbed) {
         glfwGetCursorPos(window, &Mouse::xpos, &Mouse::ypos);
@@ -245,7 +245,7 @@ void display(GLFWwindow * window, Config & config) {
         );
     }
 
-    auto cameraY = player.camera().position.absoluteY() + player.eye;
+    auto cameraY = player.position().absoluteY() + player.eye;
 
     auto direction = player.camera().direction(), right = player.camera().right(), up = glm::cross(right, direction);
     auto eye = vec3(0.0f, -cameraY, 0.0f);
@@ -408,7 +408,7 @@ inline void releaseLShift() { if (Game::player.flymode) Game::player.roc(0); }
 
 inline void pressSpace() {
     if (Game::player.flymode) Game::player.roc(elevationRate);
-    else if (!Game::player.camera().flying) Game::player.jump();
+    else if (!Game::player.isAirborne()) Game::player.jump();
 }
 
 inline void releaseSpace() { if (Game::player.flymode) Game::player.roc(0); }
