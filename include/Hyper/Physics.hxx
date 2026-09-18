@@ -76,7 +76,6 @@ public:
     bool move(const Gyrovector<Real> & v, Real dt); // Returns true iff tile changes
     void teleport(const Position &);
 
-    inline void elevate(const Real elevation) { _position.moveY(elevation); }
     inline void jump() { _hasJumpedUp = true; }
 
     inline constexpr const auto & map()      const { return _map;      }
