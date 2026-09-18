@@ -138,11 +138,11 @@ namespace API {
         using namespace Game;
         luaL_checktype(vm, 1, LUA_TTABLE);
 
-        lua_getfield(vm, 1, "eye"); player.eye = luaL_checknumber(vm, -1); lua_pop(vm, 1);
+        lua_getfield(vm, 1, "eye"); camera.eye = luaL_checknumber(vm, -1); lua_pop(vm, 1);
         lua_getfield(vm, 1, "height"); player.height = luaL_checknumber(vm, -1); lua_pop(vm, 1);
         lua_getfield(vm, 1, "gravity"); player.gravity = luaL_checknumber(vm, -1); lua_pop(vm, 1);
-        lua_getfield(vm, 1, "jump"); player.jumpHeight(luaL_checknumber(vm, -1)); lua_pop(vm, 1);
-        lua_getfield(vm, 1, "walk"); player.walkSpeed = luaL_checknumber(vm, -1) * Tesselation::meter; lua_pop(vm, 1);
+        lua_getfield(vm, 1, "jump"); player.jumpHeight = luaL_checknumber(vm, -1); lua_pop(vm, 1);
+        lua_getfield(vm, 1, "walk"); player.walkingSpeed = luaL_checknumber(vm, -1) * Tesselation::meter; lua_pop(vm, 1);
 
         return 0;
     }

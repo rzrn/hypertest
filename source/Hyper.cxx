@@ -121,7 +121,7 @@ void setBlock(WorldTile * C, int X, Real y, int Z, NodeId id) {
 
     C->set(X, Y, Z, {id});
 
-    if (Game::player.stuck())
+    if (!Game::player.canWalkAt())
         C->set(X, Y, Z, {0});
 
     C->requestRefresh();
@@ -129,7 +129,7 @@ void setBlock(WorldTile * C, int X, Real y, int Z, NodeId id) {
 
 void click(const Aut𝔻<Real> & origin, const GLfloat zbuffer, const Action action) {
     const auto maxₕ = 5.0 * Tesselation::meter, maxᵥ = 4.0;
-    const auto y₀ = Game::player.position().absoluteY() + Game::player.eye;
+    const auto y₀ = Game::player.position().absoluteY() + Game::camera.eye;
 
     auto v = trace(view, projection, zbuffer, y₀, action == Action::Remove);
     auto P = Gyrovector(v.x, v.z);
@@ -211,8 +211,8 @@ void display(GLFWwindow * window, Config & config) {
         auto n = std::hypot(vx, vz);
 
         if (n > 0) {
-            vx *= player.walkSpeed / n;
-            vz *= player.walkSpeed / n;
+            vx *= player.walkingSpeed / n;
+            vz *= player.walkingSpeed / n;
         }
 
         auto θ = -camera.yaw, sinθ = sin(θ), cosθ = cos(θ);
@@ -253,7 +253,7 @@ void display(GLFWwindow * window, Config & config) {
         );
     }
 
-    auto cameraY = player.position().absoluteY() + player.eye;
+    auto cameraY = player.position().absoluteY() + camera.eye;
 
     auto direction = camera.direction(), right = camera.right(), up = glm::cross(right, direction);
     auto eye = vec3(0.0f, -cameraY, 0.0f);
@@ -411,15 +411,30 @@ void rotateTile() {
 
 const Real flyVelocityY = 3.0;
 
-inline void pressLShift() { if (Game::player.flymode) Game::player.velocity.y = -flyVelocityY; }
-inline void releaseLShift() { if (Game::player.flymode) Game::player.velocity.y = 0; }
+inline void pressLShift() {
+    using namespace Game;
 
-inline void pressSpace() {
-    if (Game::player.flymode) Game::player.velocity.y = flyVelocityY;
-    else if (!Game::player.isAirborne()) Game::player.jump();
+    if (player.isFlyModeEnabled) player.velocity.y = -flyVelocityY;
 }
 
-inline void releaseSpace() { if (Game::player.flymode) Game::player.velocity.y = 0; }
+inline void releaseLShift() {
+    using namespace Game;
+
+    if (player.isFlyModeEnabled) player.velocity.y = 0;
+}
+
+inline void pressSpace() {
+    using namespace Game;
+
+    if (player.isFlyModeEnabled) player.velocity.y = flyVelocityY;
+    else if (!player.isAirborne()) player.applyJumpImpulse();
+}
+
+inline void releaseSpace() {
+    using namespace Game;
+
+    if (player.isFlyModeEnabled) player.velocity.y = 0;
+}
 
 inline void closeWindow(GLFWwindow * window) {
     glfwSetWindowShouldClose(window, GL_TRUE);
@@ -450,7 +465,7 @@ inline void toggleFlyMode() {
     using namespace Game;
 
     player.velocity.y = 0;
-    player.flymode = !player.flymode;
+    player.isFlyModeEnabled = !player.isFlyModeEnabled;
 
     crosshairBlink();
 }
@@ -458,7 +473,7 @@ inline void toggleFlyMode() {
 inline void toggleNoclip() {
     using namespace Game;
 
-    player.noclip = !player.noclip;
+    player.isNoclipEnabled = !player.isNoclipEnabled;
 
     crosshairBlink();
 }

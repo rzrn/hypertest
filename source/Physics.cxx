@@ -48,21 +48,21 @@ vec3 Camera::right() const {
     );
 }
 
-bool Entity::stuck(WorldTile * C, int X, Real y, int Z) {
-    if (flymode && noclip) return false;
+bool Entity::canWalkAt(WorldTile * C, int X, Real y, int Z) {
+    if (isFlyModeEnabled && isNoclipEnabled) return true;
 
-    if (C == nullptr || !C->ready()) return false;
+    if (C == nullptr || !C->ready()) return true;
 
     auto Y₁ = std::floor(y), Y₂ = std::floor(y + height);
 
     for (int Y = Y₁; Y <= Y₂; Y++)
         if (!C->walkable(X, Y, Z))
-            return true;
+            return false;
 
-    return false;
+    return true;
 }
 
-bool Entity::stuck() { return stuck(_tile, _X, _position.absoluteY(), _Z); }
+bool Entity::canWalkAt() { return canWalkAt(_tile, _X, _position.absoluteY(), _Z); }
 
 inline Gyrovector<Real> exp₀(const Real x, const Real y) {
     /* exp₀(v) converts a tangent vector v ∈ T₀(𝔻) into a gyrovector originating at z = 0.
@@ -92,7 +92,7 @@ bool Entity::moveXZ(const Real dt) {
         if (!C->ready()) return false;
 
         auto [X, Z] = P.round(C);
-        if (stuck(C, X, _position.absoluteY(), Z)) return false;
+        if (!canWalkAt(C, X, _position.absoluteY(), Z)) return false;
         _X = X; _Z = Z;
     }
 
@@ -134,14 +134,18 @@ bool Entity::moveY(const Real dt) {
     constexpr Real vmax = 32.0;
 
     auto γ⁻² = std::clamp<Real>(1 - Math::sqr(velocity.y / vmax), 0, 1);
-    auto vy = flymode ? velocity.y : velocity.y - dt * gravity * std::pow(γ⁻², 1.5);
+    auto vy = isFlyModeEnabled ? velocity.y : velocity.y - dt * gravity * std::pow(γ⁻², 1.5);
 
-    if (_hasJumpedUp) { vy += jumpSpeed; _hasJumpedUp = false; }
+    // For simplicity, we use an approximation in the v/c ≈ 0 limit here.
+    if (_hasJumpedUp) { vy += sqrt(2 * gravity * jumpHeight); _hasJumpedUp = false; }
 
     auto y = WorldTile::clamp(_position.absoluteY() + dt * vy);
 
-    if (stuck(_tile, _X, y, _Z)) { velocity.y = 0; _isAirborne = false; }
-    else { _position.setY(y); velocity.y = vy; _isAirborne = true; }
+    if (canWalkAt(_tile, _X, y, _Z)) {
+        _position.setY(y); velocity.y = vy; _isAirborne = true;
+    } else {
+        velocity.y = 0; _isAirborne = false;
+    }
 
     return false;
 }

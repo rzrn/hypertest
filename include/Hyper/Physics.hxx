@@ -46,7 +46,7 @@ public:
 };
 
 struct Camera {
-    Real yaw = 0, pitch = 0, roll = 0;
+    Real eye = 0, yaw = 0, pitch = 0, roll = 0;
 
     void rotate(const Real, const Real, const Real);
 
@@ -63,14 +63,14 @@ private:
 public:
     vec3 velocity = {0, 0, 0}; // Velocity is a tangent vector, not a gyrovector, thus `vec3`
 
-    Real eye = 0.0, height = 0.0, walkSpeed = 0.0, jumpSpeed = 0.0, gravity = 0.0;
+    Real height = 0.0, walkingSpeed = 0.0, jumpHeight = 0.0, gravity = 0.0;
 
-    bool flymode = false, noclip = false;
+    bool isFlyModeEnabled = false, isNoclipEnabled = false;
 
     Entity(WorldMap * map) : _map(map), _tile(nullptr), _X(0), _Z(0) {}
 
-    bool stuck();
-    bool stuck(WorldTile *, int, Real, int);
+    bool canWalkAt();
+    bool canWalkAt(WorldTile *, int, Real, int);
 
     // These return true iff the current tile changes
     bool moveY(const Real dt);
@@ -79,7 +79,7 @@ public:
 
     void setXYZ(const Position &);
 
-    inline void jump() { _hasJumpedUp = true; }
+    inline void applyJumpImpulse() { _hasJumpedUp = true; }
 
     inline constexpr const auto & map()      const { return _map;      }
     inline constexpr const auto & tile()     const { return _tile;     }
@@ -89,7 +89,4 @@ public:
     inline constexpr const auto & Z() const { return _Z; }
 
     inline const bool isAirborne() const { return _isAirborne; }
-
-    constexpr inline void jumpHeight(Real height)
-    { jumpSpeed = sqrt(2 * gravity * height); }
 };
