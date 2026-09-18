@@ -1,21 +1,22 @@
 #include <Hyper/Physics.hxx>
 
-std::pair<Position, bool> Position::move(const Gyrovector<Real> & v) const {
-    auto P = _relativeXZ * Aut𝔻<Real>(v); P.normalize();
+bool Position::moveXZ(const Gyrovector<Real> & v) {
+    auto P = _relativeXZ * Aut𝔻<Real>(v); auto w = P.origin();
 
-    auto w = P.origin();
-
-    if (WorldTile::isInsideOfDomain(w))
-        return std::pair(Position(P, _absoluteXZ, _absoluteOriginXZ), false);
+    if (WorldTile::isInsideOfDomain(w)) {
+        setRelativeXZ(P);
+        return false;
+    }
 
     if (auto k = WorldTile::matchNeighbour(w)) {
         const auto & Δ   = Tesselation::neighbours[*k];
         const auto & Δ⁻¹ = Tesselation::neighbours⁻¹[*k];
 
-        return std::pair(Position(Δ⁻¹ * P, _absoluteXZ * Δ), true);
+        setRelativeXZ(Δ⁻¹ * P); setAbsoluteXZ(_absoluteXZ * Δ);
+        return true;
     }
 
-    return std::pair(*this, false);
+    return false;
 }
 
 std::pair<int, int> Position::round(const WorldTile * C) const {
@@ -61,17 +62,18 @@ bool Entity::stuck(WorldTile * C, int X, Real y, int Z) {
     return false;
 }
 
-bool Entity::stuck() { return stuck(_tile, _X, _camera.climb, _Z); }
+bool Entity::stuck() { return stuck(_tile, _X, _camera.position.absoluteY(), _Z); }
 
 bool Entity::moveHorizontally(const Gyrovector<Real> & v, const Real dt) {
-    auto [P, isTileChanged] = _camera.position.move(v.scale(dt));
+    Position P(_camera.position); auto isTileChanged = P.moveXZ(v.scale(dt));
+
     auto C = isTileChanged ? map()->poll(_camera.position.absoluteXZ(), P.absoluteXZ()) : tile();
 
     if (C != nullptr) {
         if (!C->ready()) return false;
 
         auto [X, Z] = P.round(C);
-        if (stuck(C, X, _camera.climb, Z)) return false;
+        if (stuck(C, X, _camera.position.absoluteY(), Z)) return false;
         _X = X; _Z = Z;
     }
 
@@ -117,10 +119,10 @@ bool Entity::moveVertically(const Real dt) {
 
     if (jumped) { roc += jumpSpeed; jumped = false; }
 
-    auto Y = WorldTile::clamp(_camera.climb + dt * roc);
+    auto y = WorldTile::clamp(_camera.position.absoluteY() + dt * roc);
 
-    if (stuck(_tile, _X, Y, _Z)) { _camera.roc = 0; _camera.flying = false; }
-    else { _camera.climb = Y; _camera.roc = roc; _camera.flying = true; }
+    if (stuck(_tile, _X, y, _Z)) { _camera.roc = 0; _camera.flying = false; }
+    else { _camera.position.setY(y); _camera.roc = roc; _camera.flying = true; }
 
     return false;
 }
@@ -128,7 +130,7 @@ bool Entity::moveVertically(const Real dt) {
 bool Entity::move(const Gyrovector<Real> & v, Real dt)
 { return moveHorizontally(v, dt) | moveVertically(dt); }
 
-void Entity::teleport(const Position & P, const Real climb) {
-    _camera.climb = climb; _camera.position = P;
+void Entity::teleport(const Position & P) {
+    _camera.position = P;
     _tile = _map->poll(P.absoluteXZ(), P.absoluteXZ());
 }

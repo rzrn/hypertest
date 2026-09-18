@@ -8,32 +8,37 @@
 class Position {
 private:
     Aut𝔻<Real>         _relativeXZ; // Relative to `_absoluteXZ`
+    Real               _absoluteY;
     Fuchsian<Integer>  _absoluteXZ;
     Gaussian²<Integer> _absoluteOriginXZ;
 
 public:
-    Position() : _relativeXZ(Aut𝔻<Real>()), _absoluteXZ(Tesselation::I) { _absoluteOriginXZ = _absoluteXZ.origin(); }
+    Position() : _relativeXZ(Aut𝔻<Real>()), _absoluteY(0), _absoluteXZ(Tesselation::I)
+    { _absoluteOriginXZ = _absoluteXZ.origin(); }
 
-    Position(const auto & P, const auto & G, const auto & g) : _relativeXZ(P), _absoluteXZ(G), _absoluteOriginXZ(g) {}
-    Position(const auto & P, const auto & G) : _relativeXZ(P) { _relativeXZ.normalize(); set(G); }
+    Position(const Real y) : _relativeXZ(Aut𝔻<Real>()), _absoluteY(y), _absoluteXZ(Tesselation::I)
+    { _absoluteOriginXZ = _absoluteXZ.origin(); }
 
     inline constexpr const auto & relativeXZ() const { return _relativeXZ; }
 
+    inline const auto & absoluteY()        const { return _absoluteY;        }
     inline const auto & absoluteXZ()       const { return _absoluteXZ;       }
     inline const auto & absoluteOriginXZ() const { return _absoluteOriginXZ; }
 
-    inline void set(const Aut𝔻<Real> & M, const Fuchsian<Integer> & G)
-    { _relativeXZ = M; _absoluteXZ = G; _absoluteOriginXZ = G.origin(); }
+    inline void setY(const Real & Y) { _absoluteY = Y; }
 
-    inline void set(const Fuchsian<Integer> & G)
-    { _absoluteXZ = G; _absoluteXZ.normalize(); _absoluteOriginXZ = G.origin(); }
+    inline void setRelativeXZ(const Aut𝔻<Real> & M)
+    { _relativeXZ = M; _relativeXZ.normalize(); }
 
-    inline void set(const Aut𝔻<Real> & M) { _relativeXZ = M; }
+    inline void setAbsoluteXZ(const Fuchsian<Integer> & M)
+    { _absoluteXZ = M; _absoluteXZ.normalize(); _absoluteOriginXZ = M.origin(); }
 
-    // It doesn’t do anything if the speed is big enough to jump over ≥2 chunks.
-    // (Of course, this can be easily fixed by iterating
-    //  not only over neighbours, but it seems useless.)
-    std::pair<Position, bool> move(const Gyrovector<Real> &) const;
+    inline void moveY(const Real & dy) { _absoluteY += dy; }
+
+    /* It doesn’t do anything if the speed is big enough to jump over ≥2 chunks.
+      (Of course, this can be easily fixed by iterating not only over neighbours,
+       but it seems useless.) */
+    bool moveXZ(const Gyrovector<Real> &);
 
     std::pair<int, int> round(const WorldTile *) const;
 };
@@ -41,7 +46,7 @@ public:
 struct Object {
     Position position;
 
-    Real climb = 0, roc = 0;
+    Real roc = 0;
     bool flying = false;
 
     Real yaw = 0, pitch = 0, roll = 0;
@@ -71,13 +76,12 @@ public:
     bool stuck();
     bool stuck(WorldTile *, int, Real, int);
 
-    // Returns true iff tile changes
-    bool move(const Gyrovector<Real> & v, Real dt);
-    void teleport(const Position &, const Real);
+    bool move(const Gyrovector<Real> & v, Real dt); // Returns true iff tile changes
+    void teleport(const Position &);
 
-    constexpr void roc(const Real roc) { _camera.roc = roc; }
-    constexpr void elevate(const Real elevation) { _camera.climb += elevation; }
-    constexpr void jump() { jumped = true; }
+    inline void roc(const Real roc) { _camera.roc = roc; }
+    inline void elevate(const Real elevation) { _camera.position.moveY(elevation); }
+    inline void jump() { jumped = true; }
 
     inline constexpr const auto & map()    const { return _map;    }
     inline constexpr const auto & tile()   const { return _tile;   }

@@ -129,7 +129,7 @@ void setBlock(WorldTile * C, int X, Real y, int Z, NodeId id) {
 
 void click(const Aut𝔻<Real> & origin, const GLfloat zbuffer, const Action action) {
     const auto maxₕ = 5.0 * Tesselation::meter, maxᵥ = 4.0;
-    const auto y₀ = Game::player.camera().climb + Game::player.eye;
+    const auto y₀ = Game::player.camera().position.absoluteY() + Game::player.eye;
 
     auto v = trace(view, projection, zbuffer, y₀, action == Action::Remove);
     auto P = Gyrovector(v.x, v.z);
@@ -245,7 +245,7 @@ void display(GLFWwindow * window, Config & config) {
         );
     }
 
-    auto cameraY = player.camera().climb + player.eye;
+    auto cameraY = player.camera().position.absoluteY() + player.eye;
 
     auto direction = player.camera().direction(), right = player.camera().right(), up = glm::cross(right, direction);
     auto eye = vec3(0.0f, -cameraY, 0.0f);
@@ -430,7 +430,7 @@ inline void crosshairBlink() {
 inline void returnToSpawn() {
     using namespace Game;
 
-    player.teleport(Position(), 5);
+    player.teleport(Position(5));
     player.roc(0); pollNeighbours();
 
     crosshairBlink();
@@ -712,7 +712,7 @@ void setupGame(Config & config) {
     for (std::size_t k = 0; k < Tesselation::neighbours.size(); k++)
         map.poll(Tesselation::I, Tesselation::neighbours[k]);
 
-    player.teleport(Position(), 4);
+    player.teleport(Position(4));
 }
 
 void cleanUp(GLFWwindow * window) {
