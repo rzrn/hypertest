@@ -114,15 +114,15 @@ bool Entity::moveVertically(const Real dt) {
     */
     constexpr Real vmax = 32.0;
 
-    auto γ⁻² = std::clamp<Real>(1 - Math::sqr(_camera.roc / vmax), 0, 1);
-    auto roc = flymode ? _camera.roc : _camera.roc - dt * gravity * std::pow(γ⁻², 1.5);
+    auto γ⁻² = std::clamp<Real>(1 - Math::sqr(velocityY / vmax), 0, 1);
+    auto vy = flymode ? velocityY : velocityY - dt * gravity * std::pow(γ⁻², 1.5);
 
-    if (_hasJumpedUp) { roc += jumpSpeed; _hasJumpedUp = false; }
+    if (_hasJumpedUp) { vy += jumpSpeed; _hasJumpedUp = false; }
 
-    auto y = WorldTile::clamp(_position.absoluteY() + dt * roc);
+    auto y = WorldTile::clamp(_position.absoluteY() + dt * vy);
 
-    if (stuck(_tile, _X, y, _Z)) { _camera.roc = 0; _isAirborne = false; }
-    else { _position.setY(y); _camera.roc = roc; _isAirborne = true; }
+    if (stuck(_tile, _X, y, _Z)) { velocityY = 0; _isAirborne = false; }
+    else { _position.setY(y); velocityY = vy; _isAirborne = true; }
 
     return false;
 }

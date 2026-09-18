@@ -44,8 +44,6 @@ public:
 };
 
 struct Object {
-    Real roc = 0;
-
     Real yaw = 0, pitch = 0, roll = 0;
 
     void rotate(const Real, const Real, const Real);
@@ -64,6 +62,8 @@ private:
     bool moveVertically(const Real dt);
 
 public:
+    Real velocityY = 0.0;
+
     Real eye = 0.0, height = 0.0, walkSpeed = 0.0, jumpSpeed = 0.0, gravity = 0.0;
 
     bool flymode = false, noclip = false;
@@ -76,7 +76,6 @@ public:
     bool move(const Gyrovector<Real> & v, Real dt); // Returns true iff tile changes
     void teleport(const Position &);
 
-    inline void roc(const Real roc) { _camera.roc = roc; }
     inline void elevate(const Real elevation) { _position.moveY(elevation); }
     inline void jump() { _hasJumpedUp = true; }
 

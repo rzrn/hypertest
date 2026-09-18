@@ -401,17 +401,17 @@ void rotateTile() {
     player.tile()->requestRefresh();
 }
 
-const Real elevationRate = 3.0;
+const Real flyVelocityY = 3.0;
 
-inline void pressLShift() { if (Game::player.flymode) Game::player.roc(-elevationRate); }
-inline void releaseLShift() { if (Game::player.flymode) Game::player.roc(0); }
+inline void pressLShift() { if (Game::player.flymode) Game::player.velocityY = -flyVelocityY; }
+inline void releaseLShift() { if (Game::player.flymode) Game::player.velocityY = 0; }
 
 inline void pressSpace() {
-    if (Game::player.flymode) Game::player.roc(elevationRate);
+    if (Game::player.flymode) Game::player.velocityY = flyVelocityY;
     else if (!Game::player.isAirborne()) Game::player.jump();
 }
 
-inline void releaseSpace() { if (Game::player.flymode) Game::player.roc(0); }
+inline void releaseSpace() { if (Game::player.flymode) Game::player.velocityY = 0; }
 
 inline void closeWindow(GLFWwindow * window) {
     glfwSetWindowShouldClose(window, GL_TRUE);
@@ -431,7 +431,9 @@ inline void returnToSpawn() {
     using namespace Game;
 
     player.teleport(Position(5));
-    player.roc(0); pollNeighbours();
+    player.velocityY = 0;
+
+    pollNeighbours();
 
     crosshairBlink();
 }
@@ -439,7 +441,7 @@ inline void returnToSpawn() {
 inline void toggleFlyMode() {
     using namespace Game;
 
-    player.roc(0);
+    player.velocityY = 0;
     player.flymode = !player.flymode;
 
     crosshairBlink();
