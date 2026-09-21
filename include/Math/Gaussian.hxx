@@ -106,17 +106,17 @@ template<EuclideanDomain T> struct Gaussian {
         }
     }
 
-    // Given N Gaussian integers α and βᵢ (1 ≤ i ≤ N), it multiplies them
-    // by ±1/±i so that both of α components become non-negative
+    /* Given α = a + bi ∈ ℤ[i] and βᵢ ∈ ℤ[i] (1 ≤ i ≤ N), it multiplies all
+       of them by u = ±1/±i so that Re(uα) > 0 and Im(uα) ≥ 0 if α ≠ 0 */
     template<std::same_as<Gaussian<T>>... Ts> constexpr void normalize(Ts &... ts) {
-        switch (Ord²(0 <= real, 0 <= imag)) {
-            /* −1 */ case Ord²(false, false): negate();  (ts.negate(),  ...); break;
-            /* +i */ case Ord²(true,  false): muli();    (ts.muli(),    ...); break;
-            /* −i */ case Ord²(false, true):  mulnegi(); (ts.mulnegi(), ...); break;
-            /* +1 */ case Ord²(true,  true):  break;
-        }
+        using enum Math::Ordering;
 
-        if (Math::isZero<T>(real)) { mulnegi(); (ts.mulnegi(), ...); }
+        switch (Ord²(Math::compare(real, Math::zero<T>), Math::compare(imag, Math::zero<T>))) {
+            /* (−a, −b) */ case Ord²(LT, LT): case Ord²(LT, EQ): negate();  (ts.negate(),  ...); break;
+            /* (−b, +a) */ case Ord²(EQ, LT): case Ord²(GT, LT): muli();    (ts.muli(),    ...); break;
+            /* (+b, −a) */ case Ord²(LT, GT): case Ord²(EQ, GT): mulnegi(); (ts.mulnegi(), ...); break;
+            /* (+a, +b) */ case Ord²(GT, EQ): case Ord²(GT, GT): break;
+        }
     }
 
     constexpr auto operator==(const Gaussian<T> & w) const

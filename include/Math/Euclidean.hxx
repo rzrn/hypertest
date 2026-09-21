@@ -6,7 +6,12 @@
 
 #include <gmpxx.h>
 
+#include <Meta/Enumerable.hxx>
+
 namespace Math {
+    // This is used only because `mpz_class` does not implement the spaceship `<=>` operator
+    enum class Ordering : size_t { LT = 0, EQ = 1, GT = 2 };
+
     template<typename T> extern const T zero;
     template<typename T> extern const T one;
 
@@ -20,12 +25,20 @@ namespace Math {
     template<typename T> bool equal(const T &, const T &) = delete;
     template<typename T> inline bool differ(const T & t₁, const T & t₂) { return !equal<T>(t₁, t₂); }
 
+    template<typename T> Ordering compare(const T &, const T &) = delete;
+
     template<typename T> void divexact(T &, const T &, const T &) = delete;
 
     template<typename T, typename U> U field(const T &) = delete;
 
     template<typename T> void * serialize(const T &, size_t &) = delete;
 }
+
+template<> struct Enumerator<Math::Ordering> {
+    static constexpr size_t cardinal = 3;
+    static constexpr size_t ordinal(const Math::Ordering ord)
+    { return static_cast<size_t>(ord); }
+};
 
 template<typename T> concept EuclideanDomain =
 requires(T a, T b, T c, size_t k) {
@@ -44,6 +57,7 @@ requires(T a, T b, T c, size_t k) {
     { Math::isUnit(a)           } -> std::same_as<bool>;
     { Math::isNeg(a)            } -> std::same_as<bool>;
     { Math::equal(a, b)         } -> std::same_as<bool>;
+    { Math::compare(a, b)       } -> std::same_as<Math::Ordering>;
     { Math::field<T, float>(a)  } -> std::same_as<float>;
     { Math::field<T, double>(a) } -> std::same_as<double>;
     { Math::serialize(a, k)     } -> std::same_as<void *>;
@@ -66,6 +80,9 @@ namespace Math {
     template<> inline bool isNeg<int64_t>(const int64_t & n) { return n < 0; }
 
     template<> inline bool equal<int64_t>(const int64_t & n, const int64_t & m) { return n == m; }
+
+    template<> inline Ordering compare<int64_t>(const int64_t & n, const int64_t & m)
+    { auto cmp = n <=> m; return static_cast<Ordering>((0 <= cmp) + (0 < cmp)); }
 
     template<> inline float field<int64_t, float>(const int64_t & n) { return float(n); }
     template<> inline double field<int64_t, double>(const int64_t & n) { return double(n); }
@@ -93,9 +110,17 @@ namespace Math {
 
     template<> inline bool equal<mpz_class>(const mpz_class & n, const mpz_class & m) { return mpz_cmp(n.get_mpz_t(), m.get_mpz_t()) == 0; }
 
+    template<> inline Ordering compare<mpz_class>(const mpz_class & n, const mpz_class & m) {
+        int cmp = mpz_cmp(n.get_mpz_t(), m.get_mpz_t());
+        return static_cast<Ordering>((0 <= cmp) + (0 < cmp));
+    }
+
     template<> inline float field<mpz_class, float>(const mpz_class & n) { return float(mpz_get_d(n.get_mpz_t())); }
     template<> inline double field<mpz_class, double>(const mpz_class & n) { return mpz_get_d(n.get_mpz_t()); }
 
     template<> inline void * serialize<mpz_class>(const mpz_class & n, size_t & k)
     { return mpz_export(nullptr, &k, 1, 1, 0, 0, n.get_mpz_t()); }
 }
+
+static_assert(EuclideanDomain<int64_t>);
+static_assert(EuclideanDomain<mpz_class>);
