@@ -155,34 +155,41 @@ WorldTile::WorldTile(const Fuchsian<Integer> & origin, const Fuchsian<Integer> &
         (Imagine random rotations of chunks in Minecraft in a mountainous biome.)
 
         Since exp(iπk/2) ∈ {±1, ±i}, such rotation is equivalent to multiplying `a` and `c` by ±1/±i at the same time.
-        `absoluteXZ` is pre-divided by hcf(a, b, c, d), so there is always ability
-        to multiply *all* terms by ±1/±i yielding the same transformation.
+        `absoluteXZ` is pre-divided by hcf(a, b, c, d), so there is always ability to multiply *all* terms by ±1/±i
+        yielding the same transformation.
         (Two Möbius transformations are equal iff their matrices differ by multiplicative constant.)
 
         Hence we have 4 × 4 = 16 options. It’s important that we can always select multipliers
         so that both components of `a` and `b` will be non-negative, that’s what we’re doing.
+
+        We proceed as follows: for each z ∈ ℂˣ there is exactly one u ∈ {±1, ±i} such that
+        Re(uz) > 0 and Im(uz) ≥ 0, and it is given by the `.normalize(...)` method of `Gaussian<T>`.
+        For convenience, we write u = ε(z) for such a number. Then, let ε(z₁, z₂) = ε(z₁) if z₁ ≠ 0
+        and ε(z₁, z₂) = ε(z₂) if z₂ ≠ 0, if z₁ and z₂ are not simultaneously zero.
+
+        We assume that det(_absoluteXZ) = ad − bc ≠ 0, because:
+        1) det(I), det(U), det(L), det(D), det(R) ≠ 0 (see above),
+           so determinant from any of their product is also non-zero.
+           (Since det(AB) = det(A)det(B) and ℂ is a field.)
+        2) Matrix with zero determinant corresponds to constant transformation,
+           but it makes no sense in this context.
+
+        So if a = c = 0 or b = d = 0, then ad − bc = 0. Hence, ε(a, c) and ε(b, d) are defined.
+        All variants for [a, b; c, d] are of the form [(uv)a, ub; (uv)c, ud] for u, v ∈ {±1, ±i}.
+        So we take u = ε(b, d), w = ε(a, c), and v = w / u.
     */
 
-    // We assume that det(_absoluteXZ) = ad − bc ≠ 0, because:
-    //  1) det(I), det(U), det(L), det(D), det(R) ≠ 0 (see above),
-    //     so determinant from any of their product is also non-zero.
-    //     (Since det(AB) = det(A)det(B) & ℂ is a field.)
-    //  2) Matrix with zero determinant corresponds to constant transformation,
-    //     but it makes no sense in this context.
-    if (!_absoluteXZ.a.isZero()) {
-        // a ≠ 0 and b ≠ 0
-        if (!_absoluteXZ.b.isZero()) _absoluteXZ.b.normalize(_absoluteXZ.a, _absoluteXZ.c, _absoluteXZ.d);
-        // det(_absoluteXZ) = ad − bc = ad ≠ 0, so a ≠ 0 and d ≠ 0
-        else _absoluteXZ.d.normalize(_absoluteXZ.a, _absoluteXZ.c);
-
-        _absoluteXZ.a.normalize(_absoluteXZ.c);
-    } else {
-        // det(_absoluteXZ) = ad − bc = −bc ≠ 0, so b ≠ 0 and c ≠ 0
-        _absoluteXZ.b.normalize(_absoluteXZ.c, _absoluteXZ.d);
+    if (_absoluteXZ.a.isZero())
         _absoluteXZ.c.normalize();
-    }
+    else
+        _absoluteXZ.a.normalize(_absoluteXZ.c);
 
-    _absoluteOriginXZ = absoluteXZ.origin();
+    if (_absoluteXZ.b.isZero())
+        _absoluteXZ.d.normalize();
+    else
+        _absoluteXZ.b.normalize(_absoluteXZ.d);
+
+    _absoluteOriginXZ = _absoluteXZ.origin();
 
     updateMatrix(origin);
 
