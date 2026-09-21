@@ -68,12 +68,12 @@ template<EuclideanDomain T> struct Gaussian {
                                         || (Math::isZero(real) && Math::isUnit(imag)); }
 
     constexpr void negate()  { real = -real; imag = -imag; }
-    constexpr void twice()   { Math::twice(real); Math::twice(imag); }
-    constexpr void half()    { Math::half(real); Math::half(imag); }
-    constexpr void mulω()    { real -= imag; Math::twice(imag); imag += real; }
+    constexpr void mul2()    { Math::mul2(real); Math::mul2(imag); }
+    constexpr void div2()    { Math::div2(real); Math::div2(imag); }
+    constexpr void mulω()    { real -= imag; Math::mul2(imag); imag += real; }
     constexpr void mulnegi() { std::swap(real, imag); imag = -imag; }
     constexpr void muli()    { std::swap(real, imag); real = -real; }
-    constexpr void divω()    { real += imag; Math::twice(imag); imag -= real; half(); }
+    constexpr void divω()    { real += imag; Math::mul2(imag); imag -= real; div2(); }
 
     constexpr auto kind() const { return std::pair(Math::odd(real), Math::odd(imag)); }
 
@@ -89,19 +89,19 @@ template<EuclideanDomain T> struct Gaussian {
             if (β.isZero()) return α * δ;
 
             switch (Ord(std::pair(α.kind(), β.kind()))) {
-                case Digit(0, 0, 0, 0): α.half(); β.half(); δ.twice(); break;
-                case Digit(0, 0, 1, 1): α.half(); β.divω(); δ.mulω();  break;
-                case Digit(1, 1, 0, 0): α.divω(); β.half(); δ.mulω();  break;
-                case Digit(1, 1, 1, 1): α.divω(); β.divω(); δ.mulω();  break;
+                case Digit(0, 0, 0, 0): α.div2(); β.div2(); δ.mul2(); break;
+                case Digit(0, 0, 1, 1): α.div2(); β.divω(); δ.mulω(); break;
+                case Digit(1, 1, 0, 0): α.divω(); β.div2(); δ.mulω(); break;
+                case Digit(1, 1, 1, 1): α.divω(); β.divω(); δ.mulω(); break;
 
-                case Digit(0, 1, 0, 0): case Digit(1, 0, 0, 0): β.half(); break;
-                case Digit(0, 0, 0, 1): case Digit(0, 0, 1, 0): α.half(); break;
+                case Digit(0, 1, 0, 0): case Digit(1, 0, 0, 0): β.div2(); break;
+                case Digit(0, 0, 0, 1): case Digit(0, 0, 1, 0): α.div2(); break;
                 case Digit(1, 0, 0, 1): case Digit(0, 1, 1, 0): β.muli(); break;
                 case Digit(1, 1, 0, 1): case Digit(1, 1, 1, 0): α.divω(); break;
                 case Digit(0, 1, 1, 1): case Digit(1, 0, 1, 1): β.divω(); break;
 
                 case Digit(1, 0, 1, 0): case Digit(0, 1, 0, 1):
-                α += β; β.twice(); β -= α; α.half(); β.half(); break;
+                α += β; β.mul2(); β -= α; α.div2(); β.div2(); break;
             }
         }
     }

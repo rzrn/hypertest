@@ -15,8 +15,8 @@ namespace Math {
     template<typename T> extern const T zero;
     template<typename T> extern const T one;
 
-    template<typename T> void half(T &)         = delete;
-    template<typename T> void twice(T &)        = delete;
+    template<typename T> void mul2(T &)         = delete;
+    template<typename T> void div2(T &)         = delete;
     template<typename T> bool odd(const T &)    = delete;
     template<typename T> bool isZero(const T &) = delete;
     template<typename T> bool isUnit(const T &) = delete;
@@ -50,8 +50,8 @@ requires(T a, T b, T c, size_t k) {
     { Math::zero<T>             } -> std::convertible_to<T>;
     { Math::one<T>              } -> std::convertible_to<T>;
     { Math::divexact(a, b, c)   } -> std::same_as<void>;
-    { Math::half(a)             } -> std::same_as<void>;
-    { Math::twice(a)            } -> std::same_as<void>;
+    { Math::mul2(a)             } -> std::same_as<void>;
+    { Math::div2(a)             } -> std::same_as<void>;
     { Math::odd(a)              } -> std::same_as<bool>;
     { Math::isZero(a)           } -> std::same_as<bool>;
     { Math::isUnit(a)           } -> std::same_as<bool>;
@@ -69,8 +69,8 @@ namespace Math {
 
     template<> inline void divexact<int64_t>(int64_t & q, const int64_t & n, const int64_t & d) { q = n / d; };
 
-    template<> inline void twice<int64_t>(int64_t & n) { n <<= 1; }
-    template<> inline void half<int64_t>(int64_t & n) { n >>= 1; }
+    template<> inline void mul2<int64_t>(int64_t & n) { n <<= 1; }
+    template<> inline void div2<int64_t>(int64_t & n) { n >>= 1; }
 
     template<> inline bool odd<int64_t>(const int64_t & n) { return bool(n % 2); }
 
@@ -98,8 +98,8 @@ namespace Math {
     template<> inline void divexact<mpz_class>(mpz_class & q, const mpz_class & n, const mpz_class & d)
     { mpz_divexact(q.get_mpz_t(), n.get_mpz_t(), d.get_mpz_t()); };
 
-    template<> inline void twice<mpz_class>(mpz_class & n) { mpz_mul_2exp(n.get_mpz_t(), n.get_mpz_t(), 1); }
-    template<> inline void half<mpz_class>(mpz_class & n) { mpz_fdiv_q_2exp(n.get_mpz_t(), n.get_mpz_t(), 1); }
+    template<> inline void mul2<mpz_class>(mpz_class & n) { mpz_mul_2exp(n.get_mpz_t(), n.get_mpz_t(), 1); }
+    template<> inline void div2<mpz_class>(mpz_class & n) { mpz_fdiv_q_2exp(n.get_mpz_t(), n.get_mpz_t(), 1); }
 
     template<> inline bool odd<mpz_class>(const mpz_class & n) { return bool(mpz_odd_p(n.get_mpz_t())); }
 
