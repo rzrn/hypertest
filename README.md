@@ -20,7 +20,8 @@ $ cp config.lua.example config.lua
 
 ## License
 
-Copyright © 2022–2024, 2026 rzrn
+For any copyright year range specified as YYYY–ZZZZ in this package note
+that the range specifies every single year in that closed interval.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
