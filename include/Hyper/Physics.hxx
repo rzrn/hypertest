@@ -24,7 +24,7 @@
 
 #include <Hyper/Geometry.hxx>
 
-class Position {
+class WorldXYZ {
 private:
     Aut𝔻<Real>         _relativeXZ; // Relative to `_absoluteXZ`
     Real               _absoluteY;
@@ -32,10 +32,10 @@ private:
     Gaussian²<Integer> _absoluteOriginXZ;
 
 public:
-    Position() : _relativeXZ(Aut𝔻<Real>()), _absoluteY(0), _absoluteXZ(Tesselation::I)
+    WorldXYZ() : _relativeXZ(Aut𝔻<Real>()), _absoluteY(0), _absoluteXZ(Tesselation::I)
     { _absoluteOriginXZ = _absoluteXZ.origin(); }
 
-    Position(const Real y) : _relativeXZ(Aut𝔻<Real>()), _absoluteY(y), _absoluteXZ(Tesselation::I)
+    WorldXYZ(const Real y) : _relativeXZ(Aut𝔻<Real>()), _absoluteY(y), _absoluteXZ(Tesselation::I)
     { _absoluteOriginXZ = _absoluteXZ.origin(); }
 
     inline constexpr const auto & relativeXZ() const { return _relativeXZ; }
@@ -73,12 +73,12 @@ struct Camera {
 
 class Entity {
 private:
-    WorldMap * _map; WorldTile * _tile; int _X, _Z; Position _position;
+    WorldMap * _map; WorldTile * _tile; int _X, _Z; WorldXYZ _r;
 
     bool _hasJumpedUp = false, _isAirborne = false;
 
 public:
-    vec3 velocity = {0, 0, 0}; // Velocity is a tangent vector, not a gyrovector, thus `vec3`
+    vec3 v = {0, 0, 0}; // Velocity is a tangent vector, not a gyrovector, thus `vec3`
 
     Real height = 0.0, walkingSpeed = 0.0, jumpHeight = 0.0, gravity = 0.0;
 
@@ -94,16 +94,16 @@ public:
     bool moveXZ(const Real dt);
     bool moveXYZ(const Real dt);
 
-    void setXYZ(const Position &);
+    void setXYZ(const WorldXYZ &);
 
     inline void applyJumpImpulse() { _hasJumpedUp = true; }
 
-    inline constexpr const auto & map()      const { return _map;      }
-    inline constexpr const auto & tile()     const { return _tile;     }
-    inline constexpr const auto & position() const { return _position; }
-
+    inline constexpr const auto & r() const { return _r; }
     inline constexpr const auto & X() const { return _X; }
     inline constexpr const auto & Z() const { return _Z; }
+
+    inline constexpr const auto & map()  const { return _map;  }
+    inline constexpr const auto & tile() const { return _tile; }
 
     inline const bool isAirborne() const { return _isAirborne; }
 };

@@ -146,7 +146,7 @@ void setBlock(WorldTile * C, int X, Real y, int Z, NodeId id) {
 
 void click(const Aut𝔻<Real> & origin, const GLfloat zbuffer, const Action action) {
     const auto maxₕ = 5.0 * Tesselation::meter, maxᵥ = 4.0;
-    const auto y₀ = Game::player.position().absoluteY() + Game::camera.eye;
+    const auto y₀ = Game::player.r().absoluteY() + Game::camera.eye;
 
     auto v = trace(view, projection, zbuffer, y₀, action == Action::Remove);
     auto P = Gyrovector(v.x, v.z);
@@ -169,17 +169,17 @@ void click(const Aut𝔻<Real> & origin, const GLfloat zbuffer, const Action act
 void pollNeighbours() {
     using namespace Game;
 
-    map.updateMatrix(player.position().absoluteXZ());
+    map.updateMatrix(player.r().absoluteXZ());
 
     for (size_t k = 0; k < Tesselation::neighbours.size(); k++) {
         auto G = player.tile()->absoluteXZ() * Tesselation::neighbours[k];
-        map.poll(player.position().absoluteXZ(), G);
+        map.poll(player.r().absoluteXZ(), G);
     }
 
     /*for (size_t i = 0; i < Tesselation::neighbours.size(); i++)
         for (size_t j = 0; j < Tesselation::neighbours.size(); j++) {
             auto G = player.tile()->absoluteXZ() * Tesselation::neighbours[i] * Tesselation::neighbours[j];
-            map.poll(player.position().absoluteXZ(), G);
+            map.poll(player.r().absoluteXZ(), G);
     }*/
 }
 
@@ -234,8 +234,8 @@ void display(GLFWwindow * window, Config & config) {
 
         auto θ = -camera.yaw, sinθ = sin(θ), cosθ = cos(θ);
 
-        player.velocity.x = cosθ * vx - sinθ * vz;
-        player.velocity.z = sinθ * vx + cosθ * vz;
+        player.v.x = cosθ * vx - sinθ * vz;
+        player.v.z = sinθ * vx + cosθ * vz;
     }
 
     bool isTileChanged = fixedStepMove(player, dt);
@@ -257,7 +257,7 @@ void display(GLFWwindow * window, Config & config) {
         } else it++;
     }
 
-    auto origin = player.position().relativeXZ().inverse();
+    auto origin = player.r().relativeXZ().inverse();
 
     if (Mouse::grabbed) {
         glfwGetCursorPos(window, &Mouse::xpos, &Mouse::ypos);
@@ -270,7 +270,7 @@ void display(GLFWwindow * window, Config & config) {
         );
     }
 
-    auto cameraY = player.position().absoluteY() + camera.eye;
+    auto cameraY = player.r().absoluteY() + camera.eye;
 
     auto direction = camera.direction(), right = camera.right(), up = glm::cross(right, direction);
     auto eye = vec3(0.0f, -cameraY, 0.0f);
@@ -431,26 +431,26 @@ const Real flyVelocityY = 3.0;
 inline void pressLShift() {
     using namespace Game;
 
-    if (player.isFlyModeEnabled) player.velocity.y = -flyVelocityY;
+    if (player.isFlyModeEnabled) player.v.y = -flyVelocityY;
 }
 
 inline void releaseLShift() {
     using namespace Game;
 
-    if (player.isFlyModeEnabled) player.velocity.y = 0;
+    if (player.isFlyModeEnabled) player.v.y = 0;
 }
 
 inline void pressSpace() {
     using namespace Game;
 
-    if (player.isFlyModeEnabled) player.velocity.y = flyVelocityY;
+    if (player.isFlyModeEnabled) player.v.y = flyVelocityY;
     else if (!player.isAirborne()) player.applyJumpImpulse();
 }
 
 inline void releaseSpace() {
     using namespace Game;
 
-    if (player.isFlyModeEnabled) player.velocity.y = 0;
+    if (player.isFlyModeEnabled) player.v.y = 0;
 }
 
 inline void closeWindow(GLFWwindow * window) {
@@ -470,8 +470,8 @@ inline void crosshairBlink() {
 inline void returnToSpawn() {
     using namespace Game;
 
-    player.setXYZ(Position(5));
-    player.velocity.y = 0;
+    player.setXYZ(WorldXYZ(5));
+    player.v.y = 0;
 
     pollNeighbours();
 
@@ -481,7 +481,7 @@ inline void returnToSpawn() {
 inline void toggleFlyMode() {
     using namespace Game;
 
-    player.velocity.y = 0;
+    player.v.y = 0;
     player.isFlyModeEnabled = !player.isFlyModeEnabled;
 
     crosshairBlink();
@@ -754,7 +754,7 @@ void setupGame(Config & config) {
     for (std::size_t k = 0; k < Tesselation::neighbours.size(); k++)
         map.poll(Tesselation::I, Tesselation::neighbours[k]);
 
-    player.setXYZ(Position(4));
+    player.setXYZ(WorldXYZ(4));
 }
 
 void cleanUp(GLFWwindow * window) {

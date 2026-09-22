@@ -17,7 +17,7 @@
 
 #include <Hyper/Physics.hxx>
 
-bool Position::moveXZ(const Gyrovector<Real> & dr) {
+bool WorldXYZ::moveXZ(const Gyrovector<Real> & dr) {
     auto P = _relativeXZ * Aut𝔻<Real>(dr); auto w = P.origin();
 
     if (WorldTile::isInsideOfDomain(w)) {
@@ -36,7 +36,7 @@ bool Position::moveXZ(const Gyrovector<Real> & dr) {
     return false;
 }
 
-std::pair<int, int> Position::round(const WorldTile * C) const {
+std::pair<int, int> WorldXYZ::round(const WorldTile * C) const {
     auto Q = (C->absoluteXZ().inverse() * _absoluteXZ).field<Real>() * Möbius<Real>(_relativeXZ);
     return WorldTile::round(Q.origin());
 }
@@ -79,7 +79,7 @@ bool Entity::canWalkAt(WorldTile * C, int X, Real y, int Z) {
     return true;
 }
 
-bool Entity::canWalkAt() { return canWalkAt(_tile, _X, _position.absoluteY(), _Z); }
+bool Entity::canWalkAt() { return canWalkAt(_tile, _X, _r.absoluteY(), _Z); }
 
 inline Gyrovector<Real> exp₀(const Real x, const Real y) {
     /* exp₀(v) converts a tangent vector v ∈ T₀(𝔻) into a gyrovector originating at z = 0.
@@ -100,20 +100,20 @@ inline Gyrovector<Real> exp₀(const Real x, const Real y) {
 }
 
 bool Entity::moveXZ(const Real dt) {
-    auto dr = exp₀(velocity.x * dt, velocity.z * dt);
-    Position P(_position); auto isTileChanged = P.moveXZ(dr);
+    auto dr = exp₀(v.x * dt, v.z * dt);
+    WorldXYZ r(_r); auto isTileChanged = r.moveXZ(dr);
 
-    auto C = isTileChanged ? map()->poll(_position.absoluteXZ(), P.absoluteXZ()) : tile();
+    auto C = isTileChanged ? map()->poll(_r.absoluteXZ(), r.absoluteXZ()) : tile();
 
     if (C != nullptr) {
         if (!C->ready()) return false;
 
-        auto [X, Z] = P.round(C);
-        if (!canWalkAt(C, X, _position.absoluteY(), Z)) return false;
+        auto [X, Z] = r.round(C);
+        if (!canWalkAt(C, X, _r.absoluteY(), Z)) return false;
         _X = X; _Z = Z;
     }
 
-    _tile = C; _position = P; return isTileChanged;
+    _tile = C; _r = r; return isTileChanged;
 }
 
 bool Entity::moveY(const Real dt) {
@@ -150,18 +150,18 @@ bool Entity::moveY(const Real dt) {
     */
     constexpr Real vmax = 32.0;
 
-    auto γ⁻² = std::clamp<Real>(1 - Math::sqr(velocity.y / vmax), 0, 1);
-    auto vy = isFlyModeEnabled ? velocity.y : velocity.y - dt * gravity * std::pow(γ⁻², 1.5);
+    auto γ⁻² = std::clamp<Real>(1 - Math::sqr(v.y / vmax), 0, 1);
+    auto vy = isFlyModeEnabled ? v.y : v.y - dt * gravity * std::pow(γ⁻², 1.5);
 
     // For simplicity, we use an approximation in the v/c ≈ 0 limit here.
     if (_hasJumpedUp) { vy += sqrt(2 * gravity * jumpHeight); _hasJumpedUp = false; }
 
-    auto y = WorldTile::clamp(_position.absoluteY() + dt * vy);
+    auto y = WorldTile::clamp(_r.absoluteY() + dt * vy);
 
     if (canWalkAt(_tile, _X, y, _Z)) {
-        _position.setY(y); velocity.y = vy; _isAirborne = true;
+        _r.setY(y); v.y = vy; _isAirborne = true;
     } else {
-        velocity.y = 0; _isAirborne = false;
+        v.y = 0; _isAirborne = false;
     }
 
     return false;
@@ -170,5 +170,5 @@ bool Entity::moveY(const Real dt) {
 bool Entity::moveXYZ(const Real dt)
 { return moveXZ(dt) | moveY(dt); }
 
-void Entity::setXYZ(const Position & P)
-{ _position = P; _tile = _map->poll(P.absoluteXZ(), P.absoluteXZ()); }
+void Entity::setXYZ(const WorldXYZ & r)
+{ _r = r; _tile = _map->poll(r.absoluteXZ(), r.absoluteXZ()); }
