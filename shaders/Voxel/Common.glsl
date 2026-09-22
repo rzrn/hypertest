@@ -30,8 +30,8 @@ uniform mat4 projection;
 uniform mat4 view;
 
 vec4 model(vec3 v) {
-    vec2 w = applyModel(apply(cameraXZ, apply(cameraTileXZ, v.xy)));
-    return vec4(w.x, v.z + cameraTileY, w.y, 1.0);
+    vec2 w = applyModel(apply(cameraXZ, apply(cameraTileXZ, v.xz)));
+    return vec4(w[0], v.y + cameraTileY, w[1], 1.0);
 }
 
 struct Fog { bool enabled; vec4 color; float near, far; };

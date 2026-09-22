@@ -476,13 +476,13 @@ bool WorldTile::touch(const Gyrovector<Real> & w, int X, int Z) {
 }
 
 std::pair<int, int> WorldTile::round(const Gyrovector<Real> & w)
-{ return Tesselation::unapply(w.x(), w.y()); }
+{ return Tesselation::unapply(w.x(), w.z()); }
 
 bool WorldTile::isInsideOfDomain(const Gyrovector<Real> & w₀) {
     using namespace Fundamentals;
 
     // We are using symmetry of grid along axes here
-    Gyrovector<Real> w(fabs(w₀.x()), fabs(w₀.y()));
+    Gyrovector<Real> w(fabs(w₀.x()), fabs(w₀.z()));
 
     for (int Z = 0; Z < sizeTileZ; Z++) {
         const auto & A = Tesselation::corners[sizeTileX][Z + 0];

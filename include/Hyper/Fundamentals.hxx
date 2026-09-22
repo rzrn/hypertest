@@ -140,7 +140,7 @@ struct Model {
     }
 
     inline constexpr auto apply(const Gyrovector<Real> & v) const
-    { auto [x₁, x₂] = apply(v.x(), v.y()); return vec2(x₁, x₂); }
+    { auto [x₁, x₂] = apply(v.x(), v.z()); return vec2(x₁, x₂); }
 
     inline constexpr auto unapply(const vec3 w) const
     { auto [x, z] = unapply(w.x, w.z); return vec3(x, w.y, z); }

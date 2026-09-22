@@ -1,7 +1,7 @@
 #pragma once
 
 /*
-    Copyright © 2022–2024 rzrn
+    Copyright © 2022–2024, 2026 rzrn
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ struct Gyrovector {
     std::complex<T> val;
 
     constexpr inline T x() const { return val.real(); }
-    constexpr inline T y() const { return val.imag(); }
+    constexpr inline T z() const { return val.imag(); }
 
     constexpr inline bool isZero() const { return val.real() == 0.0 && val.imag() == 0.0; }
 
@@ -44,11 +44,11 @@ struct Gyrovector {
     constexpr Gyrovector(const std::complex<T> z) : val(z) {}
 
     template<typename U> constexpr operator Gyrovector<U>() const
-    { return Gyrovector<U>(x(), y()); }
+    { return Gyrovector<U>(x(), z()); }
 
-    constexpr T operator,(const Gyrovector<T> & N) const { return val.real() * N.val.real() + val.imag() * N.val.imag(); }
+    constexpr T operator,(const Gyrovector<T> & N) const { return x() * N.x() + z() * N.z(); }
 
-    constexpr inline T cross(const Gyrovector<T> & N) const { return x() * N.y() - y() * N.x(); }
+    constexpr inline T cross(const Gyrovector<T> & N) const { return x() * N.z() - z() * N.x(); }
 
     constexpr inline T abs()  const { return Math::absc(val); }
     constexpr inline T norm() const { return Math::normc(val); }
@@ -67,9 +67,9 @@ struct Gyrovector {
 
     constexpr inline auto translate(const Gyrovector<T> & N) const { return N + *this; }
 
-    constexpr inline vec2 v2() const { return vec2(x(), y()); }
+    constexpr inline vec2 v2() const { return vec2(x(), z()); }
 
-    constexpr inline vec3 v3(float h) const { return vec3(x(), y(), h); }
+    constexpr inline vec3 v3(const float y) const { return vec3(x(), y, z()); }
 };
 
 template<typename T> constexpr auto operator+(const Gyrovector<T> & A, const Gyrovector<T> & B)
