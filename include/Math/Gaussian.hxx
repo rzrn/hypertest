@@ -117,8 +117,8 @@ template<EuclideanDomain T> struct Gaussian {
                 case Digit(1, 1, 0, 1): case Digit(1, 1, 1, 0): α.divω(); break;
                 case Digit(0, 1, 1, 1): case Digit(1, 0, 1, 1): β.divω(); break;
 
-                case Digit(1, 0, 1, 0): case Digit(0, 1, 0, 1):
-                α += β; β.mul2(); β -= α; α.div2(); β.div2(); break;
+                // α, β := (β + α) / 2, (β − α) / 2
+                case Digit(1, 0, 1, 0): case Digit(0, 1, 0, 1): α += β; α.div2(); β -= α; break;
             }
         }
     }
