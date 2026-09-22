@@ -1,7 +1,7 @@
 #pragma once
 
 /*
-    Copyright © 2023–2024 rzrn
+    Copyright © 2023–2024, 2026 rzrn
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,17 +27,24 @@ template<> struct Tuple<> {
 
 // Explicit overload is needed to avoid EBCO nuances.
 template<typename T> struct Tuple<T> {
-    T fin;
+    T value;
 
     constexpr Tuple() {}
-    constexpr Tuple(const T & t) : fin(t) {}
+    constexpr Tuple(const T & t) : value(t) {
+        static_assert(sizeof(Tuple<T>) == sizeof(T));
+    }
 };
 
 template<typename T, typename... Ts> struct Tuple<T, Ts...> {
     T first; Tuple<Ts...> second;
 
     constexpr Tuple() {}
-    constexpr Tuple(const T & t, Ts... ts) : first(t), second(Tuple<Ts...>(ts...)) {}
+    constexpr Tuple(const T & t, Ts... ts) : first(t), second(Tuple<Ts...>(ts...)) {
+        static_assert(
+            sizeof(Tuple<T, Ts...>) == sizeof(T) + sizeof(Tuple<Ts...>),
+            "extra padding is inserted to Tuple<...> by your compiler"
+        );
+    }
 };
 
 template<class... T> Tuple(T...) -> Tuple<T...>;
