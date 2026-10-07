@@ -716,7 +716,7 @@ void buildFloor(WorldTile * C) {
         }
     }
 
-    for (int Y = 0; Y <= WorldTile::sizeTileY; Y++) {
+    for (int Y = 0; Y < WorldTile::sizeTileY; Y++) {
         C->set(0,                   Y, 0,                   value);
         C->set(0,                   Y, WorldTile::maxTileZ, value);
         C->set(WorldTile::maxTileX, Y, 0,                   value);
