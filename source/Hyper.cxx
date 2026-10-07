@@ -317,12 +317,6 @@ void display(GLFWwindow * window, Config & config) {
     aimVao.draw(GL_LINES);
 }
 
-void setupSheet() {
-    using namespace Game;
-
-    glEnable(GL_CULL_FACE);
-}
-
 void grabMouse(GLFWwindow * window) {
     using namespace Game;
 
@@ -695,6 +689,8 @@ void setupGL(GLFWwindow * window, Config & config) {
     setupWindowSize(window, Window::width, Window::height);
 
     pbo.initialize();
+
+    glEnable(GL_CULL_FACE);
 }
 
 void buildFloor(WorldTile * C) {
@@ -775,7 +771,6 @@ int main(int argc, char * argv[]) {
 
     map.file.open(config.world);
     setupGame(config);
-    setupSheet();
 
     updateHotbar();
 
