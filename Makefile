@@ -12,23 +12,23 @@ override CFLAGS += -Wall -std=c++20 -I$(INCLUDEDIR) -Wno-bitwise-instead-of-logi
 
 ifeq ($(OS),Windows_NT)
 	BINARY = Hyper.exe
-	override LDFLAGS += -lsqlite3 -lgmpxx -lgmp -lluajit-5.1 -lglfw3 -lglew32 -lopengl32 -lglu32
+	override LDFLAGS += -lgmpxx -lgmp -lluajit-5.1 -lglfw3 -lglew32 -lopengl32 -lglu32
 else
 	BINARY = Hyper
 
 	UNAME := $(shell uname -s)
 
 	ifeq ($(UNAME),Linux)
-		override LDFLAGS += -lsqlite3 -lgmpxx -lgmp -lluajit-5.1 -lglfw -lGLEW -lGL -lGLU
+		override LDFLAGS += -lgmpxx -lgmp -lluajit-5.1 -lglfw -lGLEW -lGL -lGLU
 	endif
 
 	ifeq ($(UNAME),FreeBSD)
 		override CFLAGS  += -I/usr/local/include
-		override LDFLAGS += -pthread -L/usr/local/lib -lsqlite3 -lgmpxx -lgmp -lluajit-5.1 -lglfw -lGLEW -lGL -lGLU
+		override LDFLAGS += -pthread -L/usr/local/lib -lgmpxx -lgmp -lluajit-5.1 -lglfw -lGLEW -lGL -lGLU
 	endif
 
 	ifeq ($(UNAME),Darwin)
-		override LDFLAGS += -lsqlite3 -lgmpxx -lgmp -lluajit-5.1 -lglfw -lGLEW -framework CoreVideo -framework OpenGL -framework IOKit -framework Cocoa -framework Carbon
+		override LDFLAGS += -lgmpxx -lgmp -lluajit-5.1 -lglfw -lGLEW -framework CoreVideo -framework OpenGL -framework IOKit -framework Cocoa -framework Carbon
 	endif
 endif
 
