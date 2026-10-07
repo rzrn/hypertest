@@ -171,7 +171,7 @@ void click(const Aut𝔻<Real> & origin, const GLfloat zbuffer, const Action act
 }
 
 template<ShaderSpec Spec>
-inline void uploadMVP(ShaderProgram<Spec> * shader, Aut𝔻<Real> & cameraXZ, Real cameraY) {
+inline void uploadMVP(ShaderProgram<Spec> * shader, vec4 fog, Aut𝔻<Real> & cameraXZ, Real cameraY) {
     shader->uniform("view", view);
     shader->uniform("projection", projection);
 
@@ -181,6 +181,8 @@ inline void uploadMVP(ShaderProgram<Spec> * shader, Aut𝔻<Real> & cameraXZ, Re
     shader->uniform("cameraXZ.d", cameraXZ.d());
 
     shader->uniform("cameraY", float(cameraY));
+
+    shader->uniform("fog.color", fog);
 }
 
 double globaltime = 0;
@@ -268,7 +270,11 @@ void display(GLFWwindow * window, Config & config) {
     view = glm::scale(view, vec3(1.0f, Render::standard->meter, 1.0f));
     view = glm::translate(view, eye);
 
-    glClearColor(Render::background[0], Render::background[1], Render::background[2], Render::background[3]);
+    auto fog = player.tile() != nullptr
+             ? static_cast<vec4>(player.tile()->fog)
+             : vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+    glClearColor(fog[0], fog[1], fog[2], fog[3]);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glBlendFunc(GL_ONE, GL_ZERO);
@@ -282,7 +288,7 @@ void display(GLFWwindow * window, Config & config) {
         std::lock_guard<std::mutex> guardRead(map.readMutex);
 
         faceShader->use();
-        uploadMVP(faceShader, cameraXZ, cameraY);
+        uploadMVP(faceShader, fog, cameraXZ, cameraY);
 
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(1.0, 1.0);
@@ -292,7 +298,7 @@ void display(GLFWwindow * window, Config & config) {
         glDisable(GL_POLYGON_OFFSET_FILL);
 
         edgeShader->use();
-        uploadMVP(edgeShader, cameraXZ, cameraY);
+        uploadMVP(edgeShader, fog, cameraXZ, cameraY);
 
         for (auto tile : map) tile->renderEdges(edgeShader, Y₁, Y₂);
     }
@@ -656,7 +662,6 @@ inline void uploadPrims(ShaderProgram<Spec> * shader, Config & config) {
     shader->uniform("fog.enabled", config.fog.enabled);
     shader->uniform("fog.near",    config.fog.near);
     shader->uniform("fog.far",     config.fog.far);
-    shader->uniform("fog.color",   config.fog.color);
 }
 
 void setupShaders(Config & config) {

@@ -29,8 +29,6 @@ struct Config {
     struct {
         bool enabled = false;
         GLfloat near = 1.0, far = 5.0;
-
-        glm::vec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
     } fog;
 
     struct {

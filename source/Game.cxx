@@ -39,8 +39,6 @@ namespace Render {
 
     Real fov, near, far;
     Standard * standard;
-
-    vec4 background = {1.0f, 1.0f, 1.0f, 1.0f};
 }
 
 namespace GUI {

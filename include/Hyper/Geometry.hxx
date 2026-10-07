@@ -158,7 +158,7 @@ private:
     uint8_t _vxl[HVXL::sizeTile];
 
 public:
-    uint64_t hash = 0; off_t fileOffset = 0;
+    uint64_t hash = 0; off_t fileOffset = 0; RGB3f fog;
 
     bool isToBeErased = false;
 

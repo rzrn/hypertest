@@ -65,9 +65,6 @@ Config::Config(LuaJIT * luajit, const char * filename) {
 
             if (LuaNumber far_v = fog_v.getitem("far"))
                 fog.far = far_v.decode();
-
-            if (LuaVec4 color_v = fog_v.getitem("color"))
-                fog.color = color_v.decode();
         }
 
         if (LuaTable gui_v = config.getitem("gui")) {

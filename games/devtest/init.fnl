@@ -16,5 +16,3 @@
    :gravity 9.8
    :jump    2.05
    :walk    3.0})
-
-(core.background 1.0 1.0 1.0 1.0)

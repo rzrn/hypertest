@@ -166,7 +166,7 @@ NodeRegistry::NodeRegistry() {
     }});
 }
 
-WorldTile::WorldTile(const Fuchsian<Integer> & absoluteXZ) : _cameraHorizontalDistance(-1), _absoluteXZ(absoluteXZ), _vxl{0} {
+WorldTile::WorldTile(const Fuchsian<Integer> & absoluteXZ) : _cameraHorizontalDistance(-1), _absoluteXZ(absoluteXZ), _vxl{0}, fog(1.0f) {
     /*
         Unfortunately, precomposition of `absoluteXZ` with (z ↦ z × exp(iπk/2)) for k ∈ ℤ
         will yield matrix able to render this tile in the same place but rotated about its own center by πk/2 radians.
@@ -535,15 +535,11 @@ void WorldMap::updateCameraXZ(const Fuchsian<Integer> & origin) {
 }
 
 void WorldTile::load(HVXL & file) {
-    RGB3f fog;
-
     file.readTileDataAt(fileOffset, _vxl, fog);
     _isModified = false; // ‘Unmodified’ here means ‘synchronized with the disk’
 }
 
 void WorldTile::save(HVXL & file) {
-    RGB3f fog(1.0f, 1.0f, 1.0f);
-
     file.writeTileDataAt(fileOffset, _vxl, fog);
     _isModified = false;
 }
