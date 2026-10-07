@@ -1,5 +1,5 @@
 return {
-    world = "world.sqlite3",
+    world = "world.hvxl",
 
     fog = {
         enabled = true,
@@ -9,8 +9,8 @@ return {
     },
 
     camera = {
-        horizontalRenderDistance = 5,
-        verticalRenderDistance   = 64,
+        horizontalRenderDistance = 2.75,
+        verticalRenderDistance   = 48,
         fov                      = 80,
         near                     = 1e-2,
         far                      = 150,

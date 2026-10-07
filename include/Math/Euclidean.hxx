@@ -18,6 +18,8 @@
 */
 
 #include <concepts>
+
+#include <cstddef>
 #include <cstdint>
 #include <cmath>
 
@@ -48,7 +50,8 @@ namespace Math {
 
     template<typename T, typename U> U field(const T &) = delete;
 
-    template<typename T> void * serialize(const T &, size_t &) = delete;
+    template<typename T> size_t size(const T &) = delete;
+    template<typename T> size_t toBytes(const T &, uint8_t *) = delete;
 }
 
 template<> struct Enumerator<Math::Ordering> {
@@ -58,7 +61,7 @@ template<> struct Enumerator<Math::Ordering> {
 };
 
 template<typename T> concept EuclideanDomain =
-requires(T a, T b, T c, size_t k) {
+requires(T a, T b, T c, uint8_t * ptr, size_t k) {
     { -a                        } -> std::convertible_to<T>;
     { a + b                     } -> std::convertible_to<T>;
     { a - b                     } -> std::convertible_to<T>;
@@ -77,7 +80,8 @@ requires(T a, T b, T c, size_t k) {
     { Math::compare(a, b)       } -> std::same_as<Math::Ordering>;
     { Math::field<T, float>(a)  } -> std::same_as<float>;
     { Math::field<T, double>(a) } -> std::same_as<double>;
-    { Math::serialize(a, k)     } -> std::same_as<void *>;
+    { Math::size(a)             } -> std::same_as<size_t>;
+    { Math::toBytes(a, ptr)     } -> std::same_as<size_t>;
 };
 
 namespace Math {
@@ -104,8 +108,22 @@ namespace Math {
     template<> inline float field<int64_t, float>(const int64_t & n) { return float(n); }
     template<> inline double field<int64_t, double>(const int64_t & n) { return double(n); }
 
-    template<> inline void * serialize<int64_t>(const int64_t & n, size_t & k)
-    { auto retval = new int64_t; *retval = std::abs(n); k = sizeof(int64_t); return retval; }
+    template<> inline size_t size(const int64_t & n) { return 8; }
+
+    template<> inline size_t toBytes(const int64_t & n, uint8_t * rop) {
+        uint64_t value = std::abs(n);
+
+        rop[0] = static_cast<uint8_t>(value >> 56);
+        rop[1] = static_cast<uint8_t>(value >> 48);
+        rop[2] = static_cast<uint8_t>(value >> 40);
+        rop[3] = static_cast<uint8_t>(value >> 32);
+        rop[4] = static_cast<uint8_t>(value >> 24);
+        rop[5] = static_cast<uint8_t>(value >> 16);
+        rop[6] = static_cast<uint8_t>(value >> 8);
+        rop[7] = static_cast<uint8_t>(value >> 0);
+
+        return 8;
+    }
 }
 
 namespace Math {
@@ -135,8 +153,13 @@ namespace Math {
     template<> inline float field<mpz_class, float>(const mpz_class & n) { return float(mpz_get_d(n.get_mpz_t())); }
     template<> inline double field<mpz_class, double>(const mpz_class & n) { return mpz_get_d(n.get_mpz_t()); }
 
-    template<> inline void * serialize<mpz_class>(const mpz_class & n, size_t & k)
-    { return mpz_export(nullptr, &k, 1, 1, 0, 0, n.get_mpz_t()); }
+    template<> inline size_t size(const mpz_class & n) {
+        // https://ftp.gnu.org/old-gnu/Manuals/gmp-4.1/html_node/Integer-Import-and-Export.html
+        return (mpz_sizeinbase(n.get_mpz_t(), 2) + 7) / 8;
+    }
+
+    template<> inline size_t toBytes(const mpz_class & n, uint8_t * rop)
+    { size_t retval; mpz_export(rop, &retval, 1, 1, 0, 0, n.get_mpz_t()); return retval; }
 }
 
 static_assert(EuclideanDomain<int64_t>);

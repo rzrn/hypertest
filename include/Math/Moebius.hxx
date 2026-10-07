@@ -19,9 +19,8 @@
 
 #include <Math/Gyrovector.hxx>
 
-// M = (az + b) / (cz + d)
 template<typename T> struct Möbius {
-    std::complex<T> a, b, c, d;
+    std::complex<T> a, b, c, d; // M = (az + b) / (cz + d)
 
     constexpr Möbius() : a(1), b(0), c(0), d(1) {}
     constexpr Möbius(auto a, auto b, auto c, auto d) : a(a), b(b), c(c), d(d) {}

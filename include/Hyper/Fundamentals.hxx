@@ -150,14 +150,6 @@ struct Model {
 };
 
 namespace Fundamentals {
-    constexpr int sizeTileX = 16;
-    constexpr int sizeTileY = 256;
-    constexpr int sizeTileZ = 16;
-
-    constexpr int maxTileX = sizeTileX - 1;
-    constexpr int maxTileY = sizeTileY - 1;
-    constexpr int maxTileZ = sizeTileZ - 1;
-
     // https://www.researchgate.net/publication/299161235_THE_HYPERBOLIC_SSQUARE_AND_MOBIUS_TRANSFORMATIONS
     // https://link.springer.com/book/10.1007/978-3-031-02396-5, “A Gyrovector Space Approach to Hyperbolic Geometry”
     // https://www.amazon.com/Analytic-Hyperbolic-Geometry-Einsteins-Relativity/dp/9811244103, “Analytic Hyperbolic Geometry and Albert Einstein’s Special Theory of Relativity”

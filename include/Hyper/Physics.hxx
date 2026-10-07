@@ -94,6 +94,7 @@ public:
     bool moveXZ(const Real dt);
     bool moveXYZ(const Real dt);
 
+    void setXYZ();
     void setXYZ(const WorldXYZ &);
 
     inline void applyJumpImpulse() { _hasJumpedUp = true; }

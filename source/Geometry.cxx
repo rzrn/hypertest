@@ -16,8 +16,11 @@
 */
 
 #include <Hyper/Geometry.hxx>
+#include <Hyper/Game.hxx>
 
 namespace Tesselation {
+    using namespace Fundamentals;
+
     // Tile’s neighbours in tesselation
     const Fuchsian<Integer> I { ℤi(+1, +0), ℤi(+0, +0), ℤi(+0, +0), ℤi(+1, +0) };
     const Fuchsian<Integer> U { ℤi(+6, +0), ℤi(+6, +6), ℤi(+1, -1), ℤi(+6, +0) };
@@ -111,10 +114,8 @@ namespace Tesselation {
     }
 
     constexpr auto apply(int X, int Z) {
-        using namespace Fundamentals;
-
-        auto t₁ = 2 * Real(X) / sizeTileX - 1;
-        auto t₂ = 2 * Real(Z) / sizeTileZ - 1;
+        auto t₁ = 2 * Real(X) / WorldTile::sizeTileX - 1;
+        auto t₂ = 2 * Real(Z) / WorldTile::sizeTileZ - 1;
         return Ψ(t₁, t₂);
     }
 
@@ -129,8 +130,8 @@ namespace Tesselation {
         t₁ = std::clamp<Real>(t₁, -1.0, 0.9999); // t₁ ≤ 0.9999 < 1 so that int(X) < sizeTileX
         t₂ = std::clamp<Real>(t₂, -1.0, 0.9999);
 
-        auto X = (t₁ + 1) / 2 * sizeTileX;
-        auto Z = (t₂ + 1) / 2 * sizeTileZ;
+        auto X = (t₁ + 1) / 2 * WorldTile::sizeTileX;
+        auto Z = (t₂ + 1) / 2 * WorldTile::sizeTileZ;
 
         return std::pair(int(X), int(Z));
     }
@@ -138,10 +139,10 @@ namespace Tesselation {
     constexpr auto init() {
         using namespace Fundamentals;
 
-        Array²<Gyrovector<Real>, sizeTileX + 1, sizeTileZ + 1> retval;
+        Array²<Gyrovector<Real>, WorldTile::sizeTileX + 1, WorldTile::sizeTileZ + 1> retval;
 
-        for (int X = 0; X <= sizeTileX; X++)
-            for (int Z = 0; Z <= sizeTileZ; Z++)
+        for (int X = 0; X <= WorldTile::sizeTileX; X++)
+            for (int Z = 0; Z <= WorldTile::sizeTileZ; Z++)
                 retval[X][Z] = apply(X, Z);
 
         return retval;
@@ -152,7 +153,10 @@ namespace Tesselation {
     constexpr auto distance(int X₁, int Z₁, int X₂, int Z₂)
     { return (-corners[X₁][Z₁] + corners[X₂][Z₂]).abs(); }
 
-    constexpr Real meter = distance(sizeTileX / 2, sizeTileZ / 2, sizeTileX / 2, sizeTileZ / 2 + 1);
+    constexpr Real meter = distance(
+        WorldTile::sizeTileX / 2, WorldTile::sizeTileZ / 2,
+        WorldTile::sizeTileX / 2, WorldTile::sizeTileZ / 2 + 1
+    );
 }
 
 NodeRegistry::NodeRegistry() {
@@ -162,7 +166,7 @@ NodeRegistry::NodeRegistry() {
     }});
 }
 
-WorldTile::WorldTile(const Fuchsian<Integer> & origin, const Fuchsian<Integer> & absoluteXZ) : _absoluteXZ(absoluteXZ) {
+WorldTile::WorldTile(const Fuchsian<Integer> & absoluteXZ) : _cameraHorizontalDistance(-1), _absoluteXZ(absoluteXZ), _vxl{0} {
     /*
         Unfortunately, precomposition of `absoluteXZ` with (z ↦ z × exp(iπk/2)) for k ∈ ℤ
         will yield matrix able to render this tile in the same place but rotated about its own center by πk/2 radians.
@@ -207,41 +211,38 @@ WorldTile::WorldTile(const Fuchsian<Integer> & origin, const Fuchsian<Integer> &
         _absoluteXZ.b.normalize(_absoluteXZ.d);
 
     _absoluteOriginXZ = _absoluteXZ.origin();
-
-    updateMatrix(origin);
-
-    faces.initialize();
-    edges.initialize();
 }
 
-WorldTile::~WorldTile() { join(); delete _vxl; faces.free(); edges.free(); }
+WorldTile::~WorldTile() {
+    faces.free(); edges.free();
+}
 
 bool WorldTile::walkable(int X, Real y, int Z) {
     using namespace Fundamentals;
 
     if (sizeTileX <= X || sizeTileZ <= Z) return true;
-    return get<YALL>(X, std::floor(y), Z).id == 0;
+    return get<YALL>(X, std::floor(y), Z) == 0;
 }
 
-void drawParallelogram(FaceShader::VAO & vao, Texture & T, const Parallelogram<GLfloat> & P, GLfloat h) {
+void drawParallelogram(FaceShader::VAO & vao, vec4 color, const Parallelogram<GLfloat> & P, GLfloat h) {
     auto index = vao.index();
 
-    vao.emit(T.lu(), P.A.v3(h)); // + 0
-    vao.emit(T.ru(), P.B.v3(h)); // + 1
-    vao.emit(T.rd(), P.C.v3(h)); // + 2
-    vao.emit(T.ld(), P.D.v3(h)); // + 3
+    vao.emit(color, P.A.v3(h)); // + 0
+    vao.emit(color, P.B.v3(h)); // + 1
+    vao.emit(color, P.C.v3(h)); // + 2
+    vao.emit(color, P.D.v3(h)); // + 3
 
     vao.push(index); vao.push(index + 1); vao.push(index + 2);
     vao.push(index); vao.push(index + 2); vao.push(index + 3);
 }
 
-void drawSide(FaceShader::VAO & vao, Texture & T, const Gyrovector<GLfloat> & A, const Gyrovector<GLfloat> & B, GLfloat h₁, GLfloat h₂) {
+void drawSide(FaceShader::VAO & vao, vec4 color, const Gyrovector<GLfloat> & A, const Gyrovector<GLfloat> & B, GLfloat h₁, GLfloat h₂) {
     auto index = vao.index();
 
-    vao.emit(T.rd(), A.v3(h₁)); // + 0
-    vao.emit(T.ru(), A.v3(h₂)); // + 1
-    vao.emit(T.lu(), B.v3(h₂)); // + 2
-    vao.emit(T.ld(), B.v3(h₁)); // + 3
+    vao.emit(color, A.v3(h₁)); // + 0
+    vao.emit(color, A.v3(h₂)); // + 1
+    vao.emit(color, B.v3(h₂)); // + 2
+    vao.emit(color, B.v3(h₁)); // + 3
 
     vao.push(index); vao.push(index + 1); vao.push(index + 2);
     vao.push(index); vao.push(index + 2); vao.push(index + 3);
@@ -249,16 +250,16 @@ void drawSide(FaceShader::VAO & vao, Texture & T, const Gyrovector<GLfloat> & A,
 
 struct Mask { bool top : 1, bottom : 1, back : 1, front : 1, left : 1, right : 1; };
 
-void drawRightParallelogrammicPrism(FaceShader::VAO & vao, Cube & C, Mask m, GLfloat h, GLfloat Δh, const Parallelogram<GLfloat> & P) {
+void drawRightParallelogrammicPrism(FaceShader::VAO & vao, vec4 color, Mask m, GLfloat h, GLfloat Δh, const Parallelogram<GLfloat> & P) {
     const auto h₁ = h, h₂ = h + Δh;
 
-    if (m.top)     drawParallelogram(vao, C.top, P, h₂);
-    if (m.bottom)  drawParallelogram(vao, C.bottom, P.rev(), h₁);
+    if (m.top)     drawParallelogram(vao, color, P, h₂);
+    if (m.bottom)  drawParallelogram(vao, color, P.rev(), h₁);
 
-    if (m.back)  drawSide(vao, C.back,  P.B, P.A, h₁, h₂);
-    if (m.right) drawSide(vao, C.right, P.C, P.B, h₁, h₂);
-    if (m.front) drawSide(vao, C.front, P.D, P.C, h₁, h₂);
-    if (m.left)  drawSide(vao, C.left,  P.A, P.D, h₁, h₂);
+    if (m.back)  drawSide(vao, color, P.B, P.A, h₁, h₂);
+    if (m.right) drawSide(vao, color, P.C, P.B, h₁, h₂);
+    if (m.front) drawSide(vao, color, P.D, P.C, h₁, h₂);
+    if (m.left)  drawSide(vao, color, P.A, P.D, h₁, h₂);
 }
 
 template<typename T> inline Parallelogram<T> parallelogram(int X, int Z) {
@@ -270,41 +271,38 @@ template<typename T> inline Parallelogram<T> parallelogram(int X, int Z) {
     };
 }
 
-void drawNode(FaceShader::VAO & vao, Cube & C, Mask m, int X, int Y, int Z)
-{ drawRightParallelogrammicPrism(vao, C, m, GLfloat(Y), 1.0f, parallelogram<GLfloat>(X, Z)); }
+void drawNode(FaceShader::VAO & vao, vec4 color, Mask m, int X, int Y, int Z)
+{ drawRightParallelogrammicPrism(vao, color, m, GLfloat(Y), 1.0f, parallelogram<GLfloat>(X, Z)); }
 
-void WorldTile::emitFaces(NodeRegistry & nodeRegistry) {
+void WorldTile::emitFaces(const MapColorScheme & color) {
     using namespace Fundamentals;
 
     faces.clear();
 
     for (int Y = 0; Y < sizeTileY; Y++) {
         for (int X = 0; X < sizeTileX; X++) for (int Z = 0; Z < sizeTileZ; Z++) {
-            auto id = get(X, Y, Z).id;
+            auto value = get(X, Y, Z);
 
-            if (id == 0) continue;
+            if (value == 0) continue;
 
             Mask mask;
 
-            mask.top    = get<YALL>(X + 0, Y + 1, Z + 0).id == 0;
-            mask.bottom = get<YALL>(X + 0, Y - 1, Z + 0).id == 0;
-            mask.back   = get<ZMIN>(X + 0, Y + 0, Z - 1).id == 0;
-            mask.front  = get<ZMAX>(X + 0, Y + 0, Z + 1).id == 0;
-            mask.left   = get<XMIN>(X - 1, Y + 0, Z + 0).id == 0;
-            mask.right  = get<XMAX>(X + 1, Y + 0, Z + 0).id == 0;
+            mask.top    = get<YALL>(X + 0, Y + 1, Z + 0) == 0;
+            mask.bottom = get<YALL>(X + 0, Y - 1, Z + 0) == 0;
+            mask.back   = get<ZMIN>(X + 0, Y + 0, Z - 1) == 0;
+            mask.front  = get<ZMAX>(X + 0, Y + 0, Z + 1) == 0;
+            mask.left   = get<XMIN>(X - 1, Y + 0, Z + 0) == 0;
+            mask.right  = get<XMAX>(X + 1, Y + 0, Z + 0) == 0;
 
-            if (nodeRegistry.has(id)) {
-                auto nodeDef = nodeRegistry.get(id);
-                drawNode(faces, nodeDef.cube, mask, X, Y, Z);
-            }
+            drawNode(faces, static_cast<vec4>(color[value]), mask, X, Y, Z);
         }
 
         facesOffsetY[Y] = faces.eboElementCount();
     }
 }
 
-inline bool isEdgeVisible(Node & n₀₀, Node & n₀₁, Node & n₁₀, Node & n₁₁) {
-    bool b₀₀ = n₀₀.id == 0, b₀₁ = n₀₁.id == 0, b₁₀ = n₁₀.id == 0, b₁₁ = n₁₁.id == 0;
+inline bool isEdgeVisible(uint8_t n₀₀, uint8_t n₀₁, uint8_t n₁₀, uint8_t n₁₁) {
+    bool b₀₀ = n₀₀ == 0, b₀₁ = n₀₁ == 0, b₁₀ = n₁₀ == 0, b₁₁ = n₁₁ == 0;
 
     if (b₀₀ && b₀₁ && b₁₀ && b₁₁)
         return false; // No blocks adjacent to the edge
@@ -313,16 +311,16 @@ inline bool isEdgeVisible(Node & n₀₀, Node & n₀₁, Node & n₁₀, Node &
         return false; // The edge is blocked from all sides
 
     if (!b₀₀ && !b₀₁ && b₁₀ && b₁₁)
-        return n₀₀.id != n₀₁.id; // The edge is visible iff adjacent blocks have different colors
+        return n₀₀ != n₀₁; // The edge is visible iff adjacent blocks have different colors
 
     if (b₀₀ && b₀₁ && !b₁₀ && !b₁₁)
-        return n₁₀.id != n₁₁.id;
+        return n₁₀ != n₁₁;
 
     if (!b₀₀ && b₀₁ && !b₁₀ && b₁₁)
-        return n₀₀.id != n₁₀.id;
+        return n₀₀ != n₁₀;
 
     if (b₀₀ && !b₀₁ && b₁₀ && !b₁₁)
-        return n₀₁.id != n₁₁.id;
+        return n₀₁ != n₁₁;
 
     return true;
 }
@@ -332,7 +330,7 @@ inline void emitLine(EdgeShader::VAO & vao, vec3 && v1, vec3 && v2) {
     vao.push(); vao.emit(v2);
 }
 
-void WorldTile::emitEdges(NodeRegistry &) {
+void WorldTile::emitEdges(const MapColorScheme &) {
     using namespace Fundamentals;
 
     using namespace Tesselation;
@@ -373,8 +371,11 @@ void WorldTile::emitEdges(NodeRegistry &) {
     }
 }
 
-void WorldTile::refresh(NodeRegistry & nodeRegistry) {
-    if (needUpdateVAO) {
+bool WorldTile::uploadVAO(const Fuchsian<Integer> & origin) {
+    if (_cameraHorizontalDistance < 0)
+        updateCameraXZ(origin);
+
+    if (isToUploadVAO) {
         facesOffsetY.flip();
         edgesLowerOffsetY.flip();
         edgesUpperOffsetY.flip();
@@ -382,27 +383,29 @@ void WorldTile::refresh(NodeRegistry & nodeRegistry) {
         faces.upload(GL_DYNAMIC_DRAW);
         edges.upload(GL_DYNAMIC_DRAW);
 
-        needUpdateVAO = false;
-        _needRefresh  = false;
-        return;
+        isToUploadVAO = false;
+
+        return true;
     }
 
-    if (working()) return; _working = true;
-
-    worker = std::async(std::launch::async, [&nodeRegistry, this]() mutable {
-        emitFaces(nodeRegistry);
-        emitEdges(nodeRegistry);
-
-        needUpdateVAO = true;
-        _working = false;
-    });
+    return false;
 }
 
-void WorldTile::updateMatrix(const Fuchsian<Integer> & origin) {
+void WorldTile::updateVAO(const MapColorScheme & color) {
+    if (isToUpdateVAO && !isToUploadVAO) {
+        emitFaces(color);
+        emitEdges(color);
+
+        isToUpdateVAO = false;
+        isToUploadVAO = true;
+    }
+}
+
+void WorldTile::updateCameraXZ(const Fuchsian<Integer> & origin) {
     _cameraXZ = (origin.inverse() * _absoluteXZ).field<Real>();
     _cameraXZ.normalize();
 
-    _cameraVerticalDistance = _cameraXZ.origin().abs();
+    _cameraHorizontalDistance = _cameraXZ.origin().length();
 }
 
 template<ShaderSpec Spec>
@@ -508,143 +511,150 @@ std::optional<size_t> WorldTile::matchNeighbour(const Gyrovector<Real> & P) {
 WorldMap::WorldMap() {}
 WorldMap::~WorldMap() {}
 
-WorldTile * WorldMap::lookup(const Gaussian²<Integer> & absoluteOriginXZ) {
-    for (auto tile : pool)
+WorldTile * WorldMap::findNonThreadsafe(const Gaussian²<Integer> & absoluteOriginXZ) {
+    for (auto tile : writeQueue)
         if (tile->absoluteOriginXZ() == absoluteOriginXZ)
             return tile;
 
     return nullptr;
 }
 
-WorldTile * WorldMap::poll(const Fuchsian<Integer> & origin, const Fuchsian<Integer> & absoluteXZ) {
-    auto absoluteOriginXZ = absoluteXZ.origin();
+WorldTile * WorldMap::find(const Gaussian²<Integer> & absoluteOriginXZ) {
+    std::lock_guard<std::mutex> guardRead(readMutex);
 
-    for (auto tile : pool)
+    for (auto tile : readQueue)
         if (tile->absoluteOriginXZ() == absoluteOriginXZ)
             return tile;
 
-    auto tile = new WorldTile(origin, absoluteXZ); pool.push_back(tile);
-    tile->load(mapgen, engine); return tile;
+    return nullptr;
 }
 
-void WorldMap::updateMatrix(const Fuchsian<Integer> & origin) {
-    for (auto tile : pool)
-        tile->updateMatrix(origin);
+void WorldMap::updateCameraXZ(const Fuchsian<Integer> & origin) {
+    for (auto tile : readQueue)
+        tile->updateCameraXZ(origin);
 }
 
-const char * initcmd   = "CREATE TABLE IF NOT EXISTS atlas("
-                         "bitfield INTEGER, real1 BLOB, imag1 BLOB, real2 BLOB, imag2 BLOB,"
-                         "blob BLOB, PRIMARY KEY (bitfield, real1, imag1, real2, imag2));",
-           * loadcmd   = "SELECT blob FROM atlas WHERE bitfield = ? AND real1 = ? AND imag1 = ? AND real2 = ? AND imag2 = ?;",
-           * insertcmd = "INSERT or REPLACE INTO atlas(bitfield, real1, imag1, real2, imag2, blob) VALUES(?, ?, ?, ?, ?, ?);";
+void WorldTile::load(HVXL & file) {
+    RGB3f fog;
 
-inline void warn(sqlite3 * engine)
-{ std::fprintf(stderr, "SQLITE: %s\n", sqlite3_errmsg(engine)); }
+    file.readTileDataAt(fileOffset, _vxl, fog);
+    _isModified = false; // ‘Unmodified’ here means ‘synchronized with the disk’
+}
 
-void WorldMap::connect(std::string & filename) {
-    auto retval = sqlite3_open(filename.c_str(), &engine);
+void WorldTile::save(HVXL & file) {
+    RGB3f fog(1.0f, 1.0f, 1.0f);
 
-    if (retval != SQLITE_OK) {
-        warn(engine); sqlite3_close(engine);
-        throw std::runtime_error("`sqlite3_open` failed");
+    file.writeTileDataAt(fileOffset, _vxl, fog);
+    _isModified = false;
+}
+
+void WorldMap::save() {
+    for (auto tile : writeQueue)
+        if (tile->isModified())
+            tile->save(file);
+}
+
+WorldTile * WorldMap::queueNewTile(const Fuchsian<Integer> & absoluteXZ) {
+    auto tile = new WorldTile(absoluteXZ);
+
+    if (file.findTileOffset(tile->absoluteOriginXZ(), tile->fileOffset, tile->hash)) {
+        if (mapgen != nullptr) (*mapgen)(tile);
+
+        tile->threadsafeSave();
+    } else {
+        tile->load(file);
     }
 
-    char * errmsg; retval = sqlite3_exec(engine, initcmd, nullptr, 0, &errmsg);
+    tile->threadsafeUpdateVAO();
 
-    if (retval != SQLITE_OK) {
-        std::fprintf(stderr, "SQLITE: %s\n", errmsg); sqlite3_free(errmsg);
+    writeQueue.push_back(tile);
 
-        throw std::runtime_error("sqlite3 initialization failed");
+    return tile;
+}
+
+constexpr double mapSaveTimeout = 15.0;
+
+void WorldMap::update(const Real & hrd) {
+    static double T = 0.0, mapLastSaveTime = 0.0;
+
+    auto dt = glfwGetTime() - T; T += dt;
+
+    /* It is here to eliminate some precision issues. The problem is that the distance
+       calculated before `queueNewTile` happens to be a little different than that one
+       calculated in `updateCameraXZ`. The difference is less than 10⁻⁸ but non-zero,
+       thus enough to cause subtle comparison-related problems showing as some tiles
+       loading and then unloading many times per second. */
+    constexpr auto ε = 0.001;
+
+    for (auto it = writeQueue.begin(); it != writeQueue.end();) {
+        auto tile = *it;
+
+        if (tile->cameraHorizontalDistance() > hrd + ε) {
+            tile->isToBeErased = true;
+            it = writeQueue.erase(it);
+        } else it++;
     }
-}
 
-void WorldMap::disconnect() {
-    dump();
+    size_t remSize = writeQueue.size();
 
-    for (auto tile : pool)
-        tile->join();
+    {
+        using namespace Game;
+        // TODO: this part is a little bit dirty, need to figure out a better way.
 
-    sqlite3_close(engine);
-}
+        if (player.tile() == nullptr) {
+            auto & M = player.r().absoluteXZ();
 
-inline void dumpBlob(sqlite3_stmt * statement, int index, void * src, size_t n) {
-    static uint8_t zero = 0;
+            if (findNonThreadsafe(M.origin()) == nullptr)
+                queueNewTile(M);
 
-    if (src == nullptr || n == 0)
-        sqlite3_bind_blob(statement, index, &zero, 1, SQLITE_STATIC);
-    else
-        sqlite3_bind_blob(statement, index, src, n, free);
-}
+            player.setXYZ();
+        }
+    }
 
-void dumpGaussian(sqlite3_stmt * statement, const Gaussian<Integer> & z, int idx₁, int idx₂) {
-    size_t k₁, k₂;
+    for (size_t i = 0; i < remSize; i++) {
+        auto tile = writeQueue[i];
 
-    auto blob₁ = Math::serialize(z.real, k₁);
-    auto blob₂ = Math::serialize(z.imag, k₂);
+        tile->updateVAO(file.color);
 
-    dumpBlob(statement, idx₁, blob₁, k₁);
-    dumpBlob(statement, idx₂, blob₂, k₂);
-}
+        if (0 <= tile->cameraHorizontalDistance()) {
+            // TODO: maybe we should align this with `neighbours` above?
+            static const std::array vonNeumannNeighbours = {
+                Tesselation::U, Tesselation::D, Tesselation::L, Tesselation::R
+            };
 
-void WorldTile::serialize(sqlite3_stmt * statement, int idx₀, int idx₁, int idx₂, int idx₃, int idx₄) {
-    Bitfield<uint8_t> bitfield(0);
+            for (const auto & dM : vonNeumannNeighbours) {
+                auto dr = dM.field<Real>().origin();
 
-    bitfield.set(0, Math::isNeg(_absoluteOriginXZ.first.real));
-    bitfield.set(1, Math::isNeg(_absoluteOriginXZ.first.imag));
-    bitfield.set(2, Math::isNeg(_absoluteOriginXZ.second.real));
-    bitfield.set(3, Math::isNeg(_absoluteOriginXZ.second.imag));
+                if (tile->cameraXZ().apply(dr).length() < hrd - ε) {
+                    auto M = tile->absoluteXZ() * dM;
 
-    sqlite3_bind_int(statement, idx₀, uint8_t(bitfield));
-    dumpGaussian(statement, _absoluteOriginXZ.first,  idx₁, idx₂);
-    dumpGaussian(statement, _absoluteOriginXZ.second, idx₃, idx₄);
-}
+                    // TODO: this is really slow, maybe maintain a hashtable instead?
+                    if (findNonThreadsafe(M.origin()) == nullptr)
+                        queueNewTile(M);
+                }
+            }
+        }
+    }
 
-void WorldTile::load(WorldMapgen * mapgen, sqlite3 * engine) {
-    sqlite3_stmt * statement = nullptr;
+    {
+        // This may lock the rendering thread just for few nanoseconds.
+        std::lock_guard<std::mutex> guardRead(readMutex);
+        std::swap(readQueue, writeQueue);
+    }
 
-    if (_ready) return; _working = true;
-    worker = std::async(std::launch::async, [statement, retval = 0, mapgen, engine, this]() mutable {
-        _vxl = new WorldTileData();
+    bool isMapSaveDue = T - mapLastSaveTime > mapSaveTimeout;
+    if (isMapSaveDue) mapLastSaveTime = T;
 
-        retval = sqlite3_prepare_v2(engine, loadcmd, -1, &statement, nullptr);
-        if (retval != SQLITE_OK) { warn(engine); _needUnload = true; goto fin; }
+    for (auto tile : writeQueue) {
+        if (isMapSaveDue || tile->isToBeErased)
+            if (tile->isModified())
+                tile->save(file);
 
-        serialize(statement, 1, 2, 3, 4, 5);
-        retval = sqlite3_step(statement);
+        if (tile->isToBeErased)
+            delete tile;
+    }
 
-        if (retval == SQLITE_ROW)
-            memcpy(_vxl, sqlite3_column_blob(statement, 0), sizeof(WorldTileData));
-        else { if (mapgen != nullptr) (*mapgen)(this); _dirty = true; }
-
-        if (retval == SQLITE_ERROR) warn(engine);
-        sqlite3_finalize(statement); requestRefresh();
-
-        fin: _ready = true; _working = false;
-    });
-}
-
-void WorldTile::join() { worker.wait(); }
-
-void WorldTile::dump(sqlite3 * engine) {
-    sqlite3_stmt * statement = nullptr;
-
-    if (working()) return; _working = true;
-    worker = std::async(std::launch::async, [statement, retval = 0, engine, this]() mutable {
-        retval = sqlite3_prepare_v2(engine, insertcmd, -1, &statement, nullptr);
-        if (retval != SQLITE_OK) { warn(engine); _working = false; return; }
-
-        serialize(statement, 1, 2, 3, 4, 5);
-        sqlite3_bind_blob(statement, 6, _vxl, sizeof(WorldTileData), SQLITE_TRANSIENT);
-
-        retval = sqlite3_step(statement);
-
-        if (retval != SQLITE_DONE) warn(engine); else _dirty = false;
-        sqlite3_finalize(statement); _working = false;
-    });
-}
-
-void WorldMap::dump() {
-    for (auto tile : pool)
-        if (tile->dirty())
-            tile->dump(engine);
+    /* TODO: it’s probabliy too expensive to just copy everything,
+             so it may be better to set up some queue instead. */
+    writeQueue = readQueue;
 }

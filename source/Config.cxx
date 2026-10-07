@@ -15,6 +15,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <Hyper/Geometry.hxx>
 #include <Hyper/Config.hxx>
 
 Config::Config(LuaJIT * luajit, const char * filename) {
@@ -37,7 +38,7 @@ Config::Config(LuaJIT * luajit, const char * filename) {
 
         if (LuaTable camera_v = config.getitem("camera")) {
             if (LuaNumber vrd_v = camera_v.getitem("verticalRenderDistance"))
-                camera.verticalRenderDistance = std::clamp(vrd_v.decode(), 8.0, sizeTileY / 2.0);
+                camera.verticalRenderDistance = std::clamp(vrd_v.decode(), 8.0, WorldTile::sizeTileY / 2.0);
 
             if (LuaNumber hrd_v = camera_v.getitem("horizontalRenderDistance"))
                 camera.horizontalRenderDistance = hrd_v.decode();

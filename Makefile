@@ -33,7 +33,7 @@ else
 endif
 
 DEPS    = Lua
-MODULES = Hyper Config Shader Geometry Sheet Physics Game
+MODULES = Hyper Config Shader Geometry Sheet Physics Game HVXL
 HEADERS = Math/Gaussian Math/Fuchsian Hyper/Fundamentals \
           Math/Basic Math/Gyrovector Math/Moebius Math/AutD Math/Euclidean \
           Meta/Basic Meta/Enumerable Meta/List Meta/Literal Meta/Tuple Meta/DoubleBuffer

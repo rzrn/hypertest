@@ -20,6 +20,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include <Hyper/HVXL.hxx>
 #include <Hyper/Sheet.hxx>
 #include <Hyper/Physics.hxx>
 #include <Hyper/Geometry.hxx>
@@ -38,7 +39,7 @@ namespace Game {
     extern Camera camera;
 
     constexpr size_t hotbarSize = 9;
-    extern NodeId hotbar[hotbarSize];
+    extern HVXL::node_t hotbar[hotbarSize];
     extern size_t activeSlot;
 
     namespace Render {

@@ -87,15 +87,6 @@ namespace API {
         Node
     };
 
-    int setHotbar(lua_State * vm) {
-        auto index = luaL_checkinteger(vm, 1);
-        auto id = size_t(luaL_checkinteger(vm, 2));
-
-        if (id < Game::hotbarSize) Game::hotbar[index] = id;
-
-        return 0;
-    }
-
     vec4 readRGBA(lua_State * vm, int argn) {
         lua_Integer rgba = luaL_checkinteger(vm, argn);
 
@@ -179,7 +170,6 @@ namespace API {
 static const luaL_Reg externs[] = {
     {"register",   API::attach},
     {"override",   API::override},
-    {"setHotbar",  API::setHotbar},
     {"background", API::background},
     {NULL,         NULL}
 };

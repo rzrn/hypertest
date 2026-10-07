@@ -15,7 +15,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <utility>
 #include <cstdio>
+#include <thread>
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -73,7 +75,9 @@ Real worldTileDiameter(const Real n) {
 
     constexpr Gyrovector<Real> i(D½, 0), j(0, D½), k = Coadd(i, j);
 
-    return (n * k).abs();
+    // Distance between the centers of adjacent tiles.
+    constexpr Real tileDiagDistance = k.length();
+    return n * tileDiagDistance;
 }
 
 bool fixedStepMove(Entity & E, Real Δt) {
@@ -113,7 +117,7 @@ std::optional<std::pair<WorldTile *, Gyrovector<Real>>> getNeighbour(const Gyrov
 
     for (size_t k = 0; k < Tesselation::neighbours.size(); k++) {
         auto G = player.tile()->absoluteXZ() * Tesselation::neighbours[k];
-        if (auto C = map.lookup(G.origin())) {
+        if (auto C = map.find(G.origin())) {
             auto Q = C->cameraXZ().inverse().apply(P);
 
             if (WorldTile::isInsideOfDomain(Q))
@@ -124,24 +128,24 @@ std::optional<std::pair<WorldTile *, Gyrovector<Real>>> getNeighbour(const Gyrov
     return std::nullopt;
 }
 
-void setBlock(WorldTile * C, int X, Real y, int Z, NodeId id) {
-    if (C == nullptr || !C->ready())
+void setBlock(WorldTile * C, int X, Real y, int Z, uint8_t value) {
+    if (C == nullptr)
         return;
 
-    if (Fundamentals::maxTileX < X || Fundamentals::maxTileZ < Z)
+    if (WorldTile::maxTileX < X || WorldTile::maxTileZ < Z)
         return;
 
     int Y = std::floor(WorldTile::clamp(y));
 
-    if (id != 0 && C->get(X, Y, Z).id != 0)
+    if (value != 0 && C->get(X, Y, Z) != 0)
         return;
 
-    C->set(X, Y, Z, {id});
+    C->set(X, Y, Z, value);
 
     if (!Game::player.canWalkAt())
-        C->set(X, Y, Z, {0});
-
-    C->requestRefresh();
+        C->set(X, Y, Z, 0);
+    else
+        C->threadsafeUpdateVAO();
 }
 
 void click(const Aut𝔻<Real> & origin, const GLfloat zbuffer, const Action action) {
@@ -156,31 +160,14 @@ void click(const Aut𝔻<Real> & origin, const GLfloat zbuffer, const Action act
             auto [C, Q] = *ret; auto [i, k] = WorldTile::round(Q);
 
             if (action == Action::Place && Game::activeSlot < Game::hotbarSize) {
-                auto id = Game::hotbar[Game::activeSlot];
-                if (id != 0 && Game::Registry::node.has(id))
-                    setBlock(C, i, v.y, k, id);
+                HVXL::node_t value = Game::hotbar[Game::activeSlot];
+
+                setBlock(C, i, v.y, k, value);
             }
 
             if (action == Action::Remove) setBlock(C, i, v.y, k, 0);
         }
     }
-}
-
-void pollNeighbours() {
-    using namespace Game;
-
-    map.updateMatrix(player.r().absoluteXZ());
-
-    for (size_t k = 0; k < Tesselation::neighbours.size(); k++) {
-        auto G = player.tile()->absoluteXZ() * Tesselation::neighbours[k];
-        map.poll(player.r().absoluteXZ(), G);
-    }
-
-    /*for (size_t i = 0; i < Tesselation::neighbours.size(); i++)
-        for (size_t j = 0; j < Tesselation::neighbours.size(); j++) {
-            auto G = player.tile()->absoluteXZ() * Tesselation::neighbours[i] * Tesselation::neighbours[j];
-            map.poll(player.r().absoluteXZ(), G);
-    }*/
 }
 
 template<ShaderSpec Spec>
@@ -196,14 +183,12 @@ inline void uploadMVP(ShaderProgram<Spec> * shader, Aut𝔻<Real> & cameraXZ, Re
     shader->uniform("cameraY", float(cameraY));
 }
 
-const double saveInterval = 1.0;
-
-double globaltime = 0, saveTimer = 0;
+double globaltime = 0;
 void display(GLFWwindow * window, Config & config) {
     using namespace Game;
 
     auto dt = glfwGetTime() - globaltime;
-    globaltime += dt; saveTimer += dt;
+    globaltime += dt;
 
     {
         using namespace GUI;
@@ -238,26 +223,30 @@ void display(GLFWwindow * window, Config & config) {
         player.v.z = sinθ * vx + cosθ * vz;
     }
 
-    bool isTileChanged = fixedStepMove(player, dt);
-    if (isTileChanged) pollNeighbours();
+    {
+        auto & origin = player.r().absoluteXZ();
 
-    for (auto it = map.pool.begin(); it != map.pool.end();) {
-        auto tile = *it;
+        bool isTileChanged = fixedStepMove(player, dt);
 
-        if (!tile->ready()) { it++; continue; }
+        {
+            std::lock_guard<std::mutex> guardRead(map.readMutex);
+            if (isTileChanged) map.updateCameraXZ(origin);
 
-        if (tile->needRefresh())
-            tile->refresh(Registry::node);
+            size_t uploadedMeshes = 0;
 
-        if (Render::hmax < tile->cameraVerticalDistance())
-            tile->unload();
+            for (auto tile : map) {
+                static constexpr size_t meshesMaxAtOnce = 5;
 
-        if (tile->needUnload() && !tile->dirty()) {
-            delete tile; it = map.pool.erase(it);
-        } else it++;
+                if (tile->uploadVAO(origin))
+                    uploadedMeshes++;
+
+                if (uploadedMeshes > meshesMaxAtOnce)
+                    break;
+            }
+        }
     }
 
-    auto origin = player.r().relativeXZ().inverse();
+    auto cameraXZ = player.r().relativeXZ().inverse();
 
     if (Mouse::grabbed) {
         glfwGetCursorPos(window, &Mouse::xpos, &Mouse::ypos);
@@ -289,40 +278,37 @@ void display(GLFWwindow * window, Config & config) {
     const Real & vrd = config.camera.verticalRenderDistance;
     int Y₁ = std::floor(cameraY - vrd), Y₂ = std::floor(cameraY + vrd);
 
-    faceShader->activate();
-    uploadMVP(faceShader, origin, cameraY);
+    {
+        std::lock_guard<std::mutex> guardRead(map.readMutex);
 
-    glEnable(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(1.0, 1.0);
+        faceShader->use();
+        uploadMVP(faceShader, cameraXZ, cameraY);
 
-    for (auto & tile : map.pool)
-        if (tile->ready())
-            tile->renderFaces(faceShader, Y₁, Y₂);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(1.0, 1.0);
 
-    glDisable(GL_POLYGON_OFFSET_FILL);
+        for (auto tile : map) tile->renderFaces(faceShader, Y₁, Y₂);
 
-    edgeShader->activate();
-    uploadMVP(edgeShader, origin, cameraY);
+        glDisable(GL_POLYGON_OFFSET_FILL);
 
-    for (auto & tile : map.pool)
-        if (tile->ready())
-            tile->renderEdges(edgeShader, Y₁, Y₂);
+        edgeShader->use();
+        uploadMVP(edgeShader, cameraXZ, cameraY);
+
+        for (auto tile : map) tile->renderEdges(edgeShader, Y₁, Y₂);
+    }
 
     if (auto value = pbo.read(Window::width/2 - 1, Window::height/2))
-    { auto [zbuffer, action] = *value; click(origin, zbuffer, action); }
+    { auto [zbuffer, action] = *value; click(cameraXZ, zbuffer, action); }
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_MULTISAMPLE);
 
-    dummyShader->activate();
+    dummyShader->use();
 
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
     aimVao.draw(GL_LINES);
-
-    if (saveTimer >= saveInterval)
-    { map.dump(); saveTimer = 0; }
 }
 
 void setupSheet() {
@@ -384,46 +370,40 @@ void windowFocusCallback(GLFWwindow * window, int focused) {
     if (!Window::focused) freeMouse(window);
 }
 
-WorldTileData tileBuffer;
+uint8_t clipboardTile[WorldTile::sizeTile];
 
 void copyTile() {
     using namespace Game;
 
-    const auto & src = *player.tile();
-    if (src.vxl() == nullptr) return;
-
-    memcpy(&tileBuffer, src.vxl(), sizeof(WorldTileData));
+    memcpy(&clipboardTile, std::as_const(player.tile())->vxl(), sizeof(clipboardTile));
 }
 
 void pasteTile() {
     using namespace Game;
 
-    auto dest = player.tile()->vxl();
-    if (dest == nullptr) return;
-
-    memcpy(dest, &tileBuffer, sizeof(WorldTileData));
-    player.tile()->requestRefresh();
+    memcpy(player.tile()->vxl(), &clipboardTile, sizeof(clipboardTile));
+    player.tile()->threadsafeUpdateVAO();
 }
 
 void rotateTile() {
     using namespace Game;
     using namespace Fundamentals;
 
-    auto src = player.tile()->vxl();
-    if (src == nullptr) return;
+    auto dst = player.tile()->vxl();
 
-    auto buf = new WorldTileData; memcpy(buf, src, sizeof(WorldTileData));
+    static uint8_t src[WorldTile::sizeTile];
+    memcpy(src, dst, sizeof(src));
 
-    static_assert(sizeTileX == sizeTileZ);
+    static_assert(HVXL::sizeTileX == HVXL::sizeTileZ);
 
-    for (int X = 0; X < sizeTileX; X++)
-        for (int Y = 0; Y < sizeTileY; Y++)
-            for (int Z = 0; Z < sizeTileZ; Z++)
-                src->data[X][Y][Z] = buf->data[Z][Y][maxTileX - X];
+    for (int X = 0; X < HVXL::sizeTileX; X++)
+    for (int Y = 0; Y < HVXL::sizeTileY; Y++)
+    for (int Z = 0; Z < HVXL::sizeTileZ; Z++) {
+        auto value = HVXL::readNode(&src[HVXL::offsetFromXYZ(X, Y, Z)]);
+        HVXL::writeNode(&dst[HVXL::offsetFromXYZ(Z, Y, HVXL::maxTileX - X)], value);
+    }
 
-    delete buf;
-
-    player.tile()->requestRefresh();
+    player.tile()->threadsafeUpdateVAO();
 }
 
 const Real flyVelocityY = 3.0;
@@ -470,10 +450,10 @@ inline void crosshairBlink() {
 inline void returnToSpawn() {
     using namespace Game;
 
-    player.setXYZ(WorldXYZ(5));
     player.v.y = 0;
+    player.setXYZ(WorldXYZ(5));
 
-    pollNeighbours();
+    map.updateCameraXZ(player.r().absoluteXZ());
 
     crosshairBlink();
 }
@@ -680,8 +660,8 @@ inline void uploadPrims(ShaderProgram<Spec> * shader, Config & config) {
 }
 
 void setupShaders(Config & config) {
-    faceShader->activate(); uploadPrims(faceShader, config);
-    edgeShader->activate(); uploadPrims(edgeShader, config);
+    faceShader->use(); uploadPrims(faceShader, config);
+    edgeShader->use(); uploadPrims(edgeShader, config);
 }
 
 void setupGL(GLFWwindow * window, Config & config) {
@@ -702,9 +682,7 @@ void setupGL(GLFWwindow * window, Config & config) {
     Render::near = config.camera.near;
     Render::far  = config.camera.far;
 
-    dummyShader->activate();
-
-    aimVao.initialize();
+    dummyShader->use();
 
     GUI::aimSize       = config.gui.aimSize;
     GUI::aimTargetSize = config.gui.aimSize;
@@ -715,28 +693,29 @@ void setupGL(GLFWwindow * window, Config & config) {
 }
 
 void buildFloor(WorldTile * C) {
-    using namespace Fundamentals;
+    HVXL::node_t value = 253;
 
-    /*for (int X = 0; X < sizeTileX; X++)
-        for (int Z = 0; Z < sizeTileZ; Z++)
-            C->set(X, 0, Z, {1});*/
+    /*for (int X = 0; X < WorldTile::sizeTileX; X++)
+        for (int Z = 0; Z < WorldTile::sizeTileZ; Z++)
+            C->set(X, 0, Z, value);*/
 
-    Node node = {1};
+    for (int Y = 0; Y < WorldTile::sizeTileY; Y += 16) {
+        for (int X = 0; X < WorldTile::sizeTileX; X++)
+        for (int Z = 0; Z < WorldTile::sizeTileZ; Z++) {
+            int H = Z < 4 || WorldTile::sizeTileZ - 4 <= Z ? 0 : X;
 
-    for (int Y = 0; Y < sizeTileY; Y += 16) {
-        for (int X = 0; X < sizeTileX; X++) for (int Z = 0; Z < sizeTileZ; Z++) {
-            int H = abs(Z - sizeTileZ / 2) < 4 ? X : 0;
+            C->set(X, Y + H, Z, value);
 
-            C->set(X, Y + H, Z, node);
-            if (Y + H < maxTileY) C->set(X, Y + H + 1, Z, node);
+            if (Y + H < WorldTile::maxTileY)
+                C->set(X, Y + H + 1, Z, value);
         }
     }
 
-    for (int Y = 0; Y <= sizeTileY; Y++) {
-        C->set(0,        Y, 0,        node);
-        C->set(0,        Y, maxTileZ, node);
-        C->set(maxTileX, Y, 0,        node);
-        C->set(maxTileX, Y, maxTileZ, node);
+    for (int Y = 0; Y <= WorldTile::sizeTileY; Y++) {
+        C->set(0,                   Y, 0,                   value);
+        C->set(0,                   Y, WorldTile::maxTileZ, value);
+        C->set(WorldTile::maxTileX, Y, 0,                   value);
+        C->set(WorldTile::maxTileX, Y, WorldTile::maxTileZ, value);
     }
 }
 
@@ -748,11 +727,6 @@ void setupGame(Config & config) {
 
     Render::vmax = config.camera.verticalRenderDistance;
     Render::hmax = worldTileDiameter(config.camera.horizontalRenderDistance);
-
-    map.poll(Tesselation::I, Tesselation::I);
-
-    for (std::size_t k = 0; k < Tesselation::neighbours.size(); k++)
-        map.poll(Tesselation::I, Tesselation::neighbours[k]);
 
     player.setXYZ(WorldXYZ(4));
 }
@@ -767,6 +741,16 @@ void cleanUp(GLFWwindow * window) {
 
     glfwDestroyWindow(window);
     glfwTerminate();
+}
+
+bool isLoopRunning;
+void diskThreadLoop() {
+    using namespace Game;
+    using namespace Render;
+
+    isLoopRunning = true;
+    while (isLoopRunning)
+        map.update(hmax);
 }
 
 int main(int argc, char * argv[]) {
@@ -784,7 +768,7 @@ int main(int argc, char * argv[]) {
     for (int i = 1; i < argc; i++)
         luajit.go(argv[i]);
 
-    map.connect(config.world);
+    map.file.open(config.world);
     setupGame(config);
     setupSheet();
 
@@ -792,13 +776,22 @@ int main(int argc, char * argv[]) {
 
     glfwSetTime(0);
 
+    std::thread diskThread(diskThreadLoop);
+
     while (!glfwWindowShouldClose(window)) {
         display(window, config);
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    map.disconnect();
+    isLoopRunning = false;
+
+    if (diskThread.joinable())
+        diskThread.join();
+
+    map.save();
+    map.file.close();
+
     cleanUp(window);
 
     return 0;

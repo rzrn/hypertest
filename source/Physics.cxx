@@ -68,7 +68,7 @@ vec3 Camera::right() const {
 bool Entity::canWalkAt(WorldTile * C, int X, Real y, int Z) {
     if (isFlyModeEnabled && isNoclipEnabled) return true;
 
-    if (C == nullptr || !C->ready()) return true;
+    if (C == nullptr) return false;
 
     auto Y₁ = std::floor(y), Y₂ = std::floor(y + height);
 
@@ -103,11 +103,9 @@ bool Entity::moveXZ(const Real dt) {
     auto dr = exp₀(v.x * dt, v.z * dt);
     WorldXYZ r(_r); auto isTileChanged = r.moveXZ(dr);
 
-    auto C = isTileChanged ? map()->poll(_r.absoluteXZ(), r.absoluteXZ()) : tile();
+    auto C = isTileChanged ? map()->find(r.absoluteOriginXZ()) : tile();
 
     if (C != nullptr) {
-        if (!C->ready()) return false;
-
         auto [X, Z] = r.round(C);
         if (!canWalkAt(C, X, _r.absoluteY(), Z)) return false;
         _X = X; _Z = Z;
@@ -117,8 +115,6 @@ bool Entity::moveXZ(const Real dt) {
 }
 
 bool Entity::moveY(const Real dt) {
-    if (!_tile->ready()) return false;
-
     /*
         Lorentz factor: γ(v) = 1/√(1 − v²/c²).
         Relativistic kinetic energy: T = γ(v)mc².
@@ -170,5 +166,8 @@ bool Entity::moveY(const Real dt) {
 bool Entity::moveXYZ(const Real dt)
 { return moveXZ(dt) | moveY(dt); }
 
+void Entity::setXYZ()
+{ _tile = _map->find(_r.absoluteOriginXZ()); }
+
 void Entity::setXYZ(const WorldXYZ & r)
-{ _r = r; _tile = _map->poll(r.absoluteXZ(), r.absoluteXZ()); }
+{ _r = r; _tile = _map->find(r.absoluteOriginXZ()); }

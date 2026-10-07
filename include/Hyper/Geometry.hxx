@@ -21,14 +21,15 @@
 #include <string>
 #include <vector>
 
-#include <future>
+#include <atomic>
+#include <mutex>
 
 #include <GL/glew.h>
-#include <sqlite3.h>
 
 #include <Hyper/Fundamentals.hxx>
 #include <Hyper/Shader.hxx>
 #include <Hyper/Sheet.hxx>
+#include <Hyper/HVXL.hxx>
 
 #include <Math/Fuchsian.hxx>
 #include <Math/AutD.hxx>
@@ -39,8 +40,6 @@
 using ℤi = Gaussian<Integer>;
 
 namespace Tesselation {
-    using namespace Fundamentals;
-
     enum class Direction { Identity, Up, Down, Left, Right };
     using enum Direction;
 
@@ -67,7 +66,7 @@ namespace Tesselation {
     { std::array<T, Length<Us>> retval; Eval<T, Us>::insert(0, retval); return retval; }
 
     // `... + 1` is added because there are N + 1 vertices for N intervals
-    using Grid = Array²<Gyrovector<Real>, sizeTileX + 1, sizeTileZ + 1>;
+    using Grid = Array²<Gyrovector<Real>, HVXL::sizeTileX + 1, HVXL::sizeTileZ + 1>;
 
     using Neighbours = List<
         Compose<Up>, Compose<Left>, Compose<Down>, Compose<Right>,
@@ -116,12 +115,6 @@ public:
     inline bool has(NodeId id) { return id < table.size(); }
 };
 
-struct WorldTileData {
-    Node data[Fundamentals::sizeTileX][Fundamentals::sizeTileY][Fundamentals::sizeTileZ];
-
-    WorldTileData() : data{} {}
-} __attribute__((packed));
-
 class WorldTile; using WorldMapgen = void(WorldTile *);
 
 enum : unsigned int {
@@ -136,68 +129,74 @@ enum : unsigned int {
 };
 
 class WorldTile {
+public:
+    static constexpr auto sizeTileX = HVXL::sizeTileX;
+    static constexpr auto sizeTileY = HVXL::sizeTileY;
+    static constexpr auto sizeTileZ = HVXL::sizeTileZ;
+
+    static constexpr auto maxTileX = HVXL::maxTileX;
+    static constexpr auto maxTileY = HVXL::maxTileY;
+    static constexpr auto maxTileZ = HVXL::maxTileZ;
+
+    static constexpr auto sizeTile = HVXL::sizeTile;
+
 private:
     // These are for drawing, where `_cameraVerticalDistance` is used to track tiles that are to be unloaded
-    Möbius<Real> _cameraXZ; Real _cameraVerticalDistance;
+    Möbius<Real> _cameraXZ; Real _cameraHorizontalDistance;
     // These are for indexing, where `_absoluteOriginXZ` is equal to `_absoluteXZ.origin()`
     Fuchsian<Integer> _absoluteXZ; Gaussian²<Integer> _absoluteOriginXZ;
 
-    bool _working = false; std::future<void> worker;
     FaceShader::VAO faces; EdgeShader::VAO edges;
 
-    DoubleBuffer<GLsizei, Fundamentals::sizeTileY> facesOffsetY, edgesLowerOffsetY, edgesUpperOffsetY;
+    DoubleBuffer<GLsizei, sizeTileY> facesOffsetY, edgesLowerOffsetY, edgesUpperOffsetY;
 
     inline GLsizei facesLowerOffsetY(const int Y) const { return Y > 0 ? facesOffsetY(Y - 1) : 0; }
     inline GLsizei facesUpperOffsetY(const int Y) const { return facesOffsetY(Y);                 }
 
-    bool _ready = false, _dirty = false, _needRefresh = false, _needUnload = false, needUpdateVAO = false;
+    std::atomic<bool> isToUpdateVAO = false, isToUploadVAO = false, _isModified = false;
 
-    WorldTileData * _vxl = nullptr;
+    uint8_t _vxl[HVXL::sizeTile];
 
 public:
-    WorldTile(const Fuchsian<Integer> & origin, const Fuchsian<Integer> &);
+    uint64_t hash = 0; off_t fileOffset = 0;
+
+    bool isToBeErased = false;
+
+    WorldTile(const Fuchsian<Integer> &);
 
     ~WorldTile();
 
-    void emitFaces(NodeRegistry &);
-    void emitEdges(NodeRegistry &);
+    void emitFaces(const MapColorScheme &);
+    void emitEdges(const MapColorScheme &);
 
     void renderFaces(FaceShader *, int, int);
     void renderEdges(EdgeShader *, int, int);
 
-    void updateMatrix(const Fuchsian<Integer> &);
-    void refresh(NodeRegistry &);
+    void updateCameraXZ(const Fuchsian<Integer> &);
+
+    void updateVAO(const MapColorScheme &);
+    bool uploadVAO(const Fuchsian<Integer> &);
 
     bool walkable(int, Real, int);
 
-    void serialize(sqlite3_stmt *, int, int, int, int, int);
-    void load(WorldMapgen *, sqlite3 *);
-    void dump(sqlite3 *);
-    void join();
+    void load(HVXL &);
+    void save(HVXL &);
 
-    inline bool working() const { return _working; }
+    inline void threadsafeSave() { _isModified = true; }
+    inline void threadsafeUpdateVAO() { isToUpdateVAO = true; }
 
-    inline constexpr bool ready()       { return _ready;       }
-    inline constexpr bool dirty()       { return _dirty;       }
-    inline constexpr bool needRefresh() { return _needRefresh; }
-    inline constexpr bool needUnload()  { return _needUnload;  }
+    inline const bool isModified() const { return _isModified; }
 
-    inline constexpr void unload()         { _needUnload = true;  }
-    inline constexpr auto requestRefresh() { _needRefresh = true; }
-
-    inline const auto cameraXZ()               const { return _cameraXZ;               }
-    inline const auto cameraVerticalDistance() const { return _cameraVerticalDistance; }
+    inline const auto cameraXZ()                 const { return _cameraXZ;                 }
+    inline const auto cameraHorizontalDistance() const { return _cameraHorizontalDistance; }
 
     inline const auto absoluteXZ()       const { return _absoluteXZ;       }
     inline const auto absoluteOriginXZ() const { return _absoluteOriginXZ; }
 
-    inline WorldTileData * vxl() { if (_vxl != nullptr) _dirty = true; return _vxl; }
-    inline const WorldTileData * vxl() const { return _vxl; }
-
     static inline int mod(int a, int b) { int r = a % b; return r < 0 ? r + b : r; }
 
     // TODO: make this to return a reference instead
-    template<unsigned int mask = NONE> inline Node get(int X, int Y, int Z) const {
+    template<unsigned int mask = NONE> inline uint8_t get(int X, int Y, int Z) const {
         using namespace Fundamentals;
 
         // Bounds checks are eliminated at compile time unless needed
@@ -222,11 +221,16 @@ public:
             Y = mod(Y, sizeTileY);
         }
 
-        return _vxl->data[X][Y][Z];
+        auto src = &_vxl[HVXL::offsetFromXYZ(X, Y, Z)];
+
+        return HVXL::readNode(src);
     }
 
-    inline void set(int X, int Y, int Z, const Node & node)
-    { _dirty = true; _vxl->data[X][Y][Z] = node; }
+    inline void set(int X, int Y, int Z, const HVXL::node_t value)
+    { _isModified = true; HVXL::writeNode(&_vxl[HVXL::offsetFromXYZ(X, Y, Z)], value); }
+
+    inline uint8_t * vxl() { _isModified = true; return _vxl; }
+    inline const uint8_t * vxl() const { return _vxl; }
 
     static bool touch(const Gyrovector<Real> &, int, int);
     static std::pair<int, int> round(const Gyrovector<Real> &);
@@ -234,30 +238,34 @@ public:
     static bool isInsideOfDomain(const Gyrovector<Real> &);
     static std::optional<size_t> matchNeighbour(const Gyrovector<Real> &);
 
-    static inline Real clamp(Real x)
-    { return Math::remainder<Real>(x, Fundamentals::sizeTileY); }
+    static inline Real clamp(Real x) { return Math::remainder<Real>(x, sizeTileY); }
 };
 
 class WorldMap {
 private:
-    sqlite3 * engine;
+    std::vector<WorldTile *> readQueue, writeQueue;
+
+    WorldTile * findNonThreadsafe(const Gaussian²<Integer> &);
+    WorldTile * queueNewTile(const Fuchsian<Integer> &);
 
 public:
-    std::vector<WorldTile *> pool;
+    std::mutex readMutex;
+
+    HVXL file;
+
     WorldMapgen * mapgen = nullptr;
 
     WorldMap();
     ~WorldMap();
 
-    void connect(std::string &);
-    void disconnect();
+    void save();
+    void update(const Real &);
+    void updateCameraXZ(const Fuchsian<Integer> &);
 
-    void dump();
+    WorldTile * find(const Gaussian²<Integer> &);
 
-    WorldTile * poll(const Fuchsian<Integer> & origin, const Fuchsian<Integer> &);
-    WorldTile * lookup(const Gaussian²<Integer> &);
-
-    void updateMatrix(const Fuchsian<Integer> &);
+    inline auto begin() const { return readQueue.begin(); }
+    inline auto end()   const { return readQueue.end();   }
 };
 
 template<typename T> struct Bitfield {

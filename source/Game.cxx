@@ -30,7 +30,8 @@ WorldMap map;
 Entity player(&map);
 Camera camera;
 
-NodeId hotbar[hotbarSize] = {0};
+HVXL::node_t hotbar[hotbarSize] = {30, 180, 5, 252, 215, 35, 185, 210, 255};
+
 size_t activeSlot = 0;
 
 namespace Render {

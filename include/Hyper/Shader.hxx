@@ -209,31 +209,30 @@ public:
 
     inline constexpr auto index() const { return ref; }
 
-    inline static void attrib() { GVA::attrib<stride, Params>(); }
-
     template<typename T> void uniform(const char * loc, const T & value)
     { GL::uniform<T>(ref, loc, value); };
 
-    inline void activate() { glUseProgram(ref); }
+    inline void use() { glUseProgram(ref); }
 
-    struct VAO {
-        GLuint vao, vbo, ebo;
-        GLsizei count = 0;
+    class VAO {
+    private:
+        GLuint vao = 0, vbo = 0, ebo = 0;
         VBO vertices;
         EBO indices;
 
-        inline void initialize() {
-            glGenVertexArrays(1, &vao);
-            glGenBuffers(1, &vbo);
-            glGenBuffers(1, &ebo);
-
-            glBindVertexArray(vao);
-            glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-            attrib();
-        }
-
+    public:
         inline void upload(const GLenum usage) {
+            if (vao <= 0) {
+                glGenVertexArrays(1, &vao);
+                glGenBuffers(1, &vbo);
+                glGenBuffers(1, &ebo);
+
+                glBindVertexArray(vao);
+                glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+                GVA::attrib<stride, Params>();
+            }
+
             glBindVertexArray(vao);
 
             glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -243,8 +242,6 @@ public:
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(Index), indices.data(), usage);
 
             glBindVertexArray(0);
-
-            count = indices.size();
         }
 
         inline void bindVAO() {
@@ -254,7 +251,7 @@ public:
         }
 
         inline void draw(const GLenum type)
-        { bindVAO(); glDrawElements(type, count, indexType, nullptr); }
+        { bindVAO(); glDrawElements(type, indices.size(), indexType, nullptr); }
 
         inline void draw(const GLenum type, GLsizei i1, GLsizei i2)
         { bindVAO(); glDrawElements(type, i2 - i1, indexType, reinterpret_cast<void *>(i1 * sizeof(Index))); }
@@ -277,6 +274,8 @@ public:
             glDeleteBuffers(1, &vbo);
             glDeleteBuffers(1, &ebo);
             glDeleteVertexArrays(1, &vao);
+
+            vao = ebo = vbo = 0;
         }
     };
 };

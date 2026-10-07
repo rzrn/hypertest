@@ -50,8 +50,9 @@ struct Gyrovector {
 
     constexpr inline T cross(const Gyrovector<T> & N) const { return x() * N.z() - z() * N.x(); }
 
-    constexpr inline T abs()  const { return Math::absc(val); }
-    constexpr inline T norm() const { return Math::normc(val); }
+    constexpr inline T abs()    const { return Math::absc(val);              }
+    constexpr inline T norm()   const { return Math::normc(val);             }
+    constexpr inline T length() const { return Math::atanh(Math::absc(val)); }
 
     constexpr inline auto add(const Gyrovector<T> & N) const { return Gyrovector<T>(Math::addc(val, N.val)); }
     constexpr inline auto sub(const Gyrovector<T> & N) const { return Gyrovector<T>(Math::subc(val, N.val)); }
