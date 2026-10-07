@@ -21,7 +21,6 @@
 #include <GLFW/glfw3.h>
 
 #include <Hyper/HVXL.hxx>
-#include <Hyper/Sheet.hxx>
 #include <Hyper/Physics.hxx>
 #include <Hyper/Geometry.hxx>
 #include <Hyper/Fundamentals.hxx>

@@ -28,7 +28,6 @@
 
 #include <Hyper/Fundamentals.hxx>
 #include <Hyper/Shader.hxx>
-#include <Hyper/Sheet.hxx>
 #include <Hyper/HVXL.hxx>
 
 #include <Math/Fuchsian.hxx>
