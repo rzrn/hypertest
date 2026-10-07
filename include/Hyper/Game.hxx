@@ -29,11 +29,6 @@
 enum class Action { Remove, Place };
 
 namespace Game {
-    namespace Registry {
-        extern NodeRegistry node;
-        extern Sheet sheet;
-    }
-
     extern WorldMap map;
     extern Entity player;
     extern Camera camera;

@@ -21,11 +21,6 @@ namespace Game {
 
 using namespace Fundamentals;
 
-namespace Registry {
-    Sheet sheet;
-    NodeRegistry node;
-}
-
 WorldMap map;
 Entity player(&map);
 Camera camera;

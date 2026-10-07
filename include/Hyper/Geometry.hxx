@@ -96,25 +96,6 @@ template<typename T> struct Parallelogram {
     const auto rev() const { return Parallelogram<T>(D, C, B, A); }
 };
 
-struct Cube { Texture top, bottom, left, right, front, back; };
-struct NodeDef { std::string name; Cube cube; };
-
-struct Node { NodeId id; };
-
-class NodeRegistry {
-private:
-    NodeDef air; std::vector<NodeDef> table;
-
-public:
-    NodeRegistry();
-
-    inline NodeId attach(const NodeDef & def)
-    { table.push_back(def); return table.size() - 1; }
-
-    inline NodeDef get(NodeId id) { return table[id]; }
-    inline bool has(NodeId id) { return id < table.size(); }
-};
-
 class WorldTile; using WorldMapgen = void(WorldTile *);
 
 enum : unsigned int {

@@ -1,15 +1,3 @@
-(local texture₁ (core.register core.TEXTURE 0xEEEEEEFF))
-(local texture₂ (core.register core.TEXTURE 0x00FF00FF))
-(local texture₃ (core.register core.TEXTURE 0x0000FFFF))
-(local texture₄ (core.register core.TEXTURE 0xFF0000FF))
-(local texture₅ (core.register core.TEXTURE 0xFFFF00FF))
-
-(local node₁ (core.register core.NODE {:name "Stuff 1" :textures [texture₁ texture₁ texture₁ texture₁ texture₁ texture₁]}))
-(local node₂ (core.register core.NODE {:name "Stuff 2" :textures [texture₂ texture₂ texture₂ texture₂ texture₂ texture₂]}))
-(local node₃ (core.register core.NODE {:name "Stuff 3" :textures [texture₃ texture₃ texture₃ texture₃ texture₃ texture₃]}))
-(local node₄ (core.register core.NODE {:name "Stuff 4" :textures [texture₄ texture₄ texture₄ texture₄ texture₄ texture₄]}))
-(local node₅ (core.register core.NODE {:name "Stuff 5" :textures [texture₅ texture₅ texture₅ texture₅ texture₅ texture₅]}))
-
 (core.override
   {:eye     2.5
    :height  2.7

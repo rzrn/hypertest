@@ -159,13 +159,6 @@ namespace Tesselation {
     );
 }
 
-NodeRegistry::NodeRegistry() {
-    attach({"Air", {
-        Texture(), Texture(), Texture(),
-        Texture(), Texture(), Texture()
-    }});
-}
-
 WorldTile::WorldTile(const Fuchsian<Integer> & absoluteXZ) : _cameraHorizontalDistance(-1), _absoluteXZ(absoluteXZ), _vxl{0}, fog(1.0f) {
     /*
         Unfortunately, precomposition of `absoluteXZ` with (z ↦ z × exp(iπk/2)) for k ∈ ℤ
