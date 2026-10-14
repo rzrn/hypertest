@@ -344,7 +344,7 @@ struct TileHeader {
     }
 };
 
-void HVXL::readTileData(uint8_t * buf, RGB3f & fog) {
+void HVXL::readTileData(uint8_t * buf, RGBf & fog) {
     std::fread(buf, sizeTile, 1, fp);
 
     fog.r() = readLE<float>(fp);
@@ -352,7 +352,7 @@ void HVXL::readTileData(uint8_t * buf, RGB3f & fog) {
     fog.b() = readLE<float>(fp);
 }
 
-size_t HVXL::writeTileData(const uint8_t * buf, RGB3f fog) {
+size_t HVXL::writeTileData(const uint8_t * buf, RGBf fog) {
     size_t retval = 0;
 
     if (buf == nullptr) {
@@ -385,7 +385,7 @@ bool HVXL::findTileOffset(const Gaussian²<Integer> & absoluteOriginXZ, off_t & 
         off_t offsetTile = readAt<uint64_t>(offsetTileRef);
 
         if (offsetTile == 0) {
-            static RGB3f whiteRGB(1.0f);
+            static RGBf whiteRGB(1.0f);
 
             offsetTile = offsetEOF(); thdr.write(fp);
 

@@ -29,12 +29,12 @@
 
 #include <Hyper/Fundamentals.hxx>
 
-struct RGB3f {
+struct RGBf {
     glm::vec4 value;
 
-    RGB3f() : value(0.0f, 0.0f, 0.0f, 1.0f) {}
-    RGB3f(float s) : value(s, s, s, 1.0f) {}
-    RGB3f(float r, float g, float b) : value(r, g, b, 1.0f) {}
+    RGBf() : value(0.0f, 0.0f, 0.0f, 1.0f) {}
+    RGBf(float s) : value(s, s, s, 1.0f) {}
+    RGBf(float r, float g, float b) : value(r, g, b, 1.0f) {}
 
     inline float & r() { return value[0]; }
     inline float & g() { return value[1]; }
@@ -43,7 +43,7 @@ struct RGB3f {
     inline explicit operator glm::vec4() const { return value; }
 };
 
-using MapColorScheme = RGB3f[256];
+using MapColorScheme = RGBf[256];
 
 class HVXL {
 public:
@@ -87,8 +87,8 @@ private:
 
     size_t writeHashRecord();
 
-    void readTileData(uint8_t *, RGB3f &);
-    size_t writeTileData(const uint8_t *, RGB3f);
+    void readTileData(uint8_t *, RGBf &);
+    size_t writeTileData(const uint8_t *, RGBf);
 
 public:
     char mapname[256]; uint32_t seed; MapColorScheme color;
@@ -104,14 +104,14 @@ public:
     void readMapHeader();
     size_t writeMapHeader();
 
-    inline void readTileDataAt(off_t offset, uint8_t * buf, RGB3f & fog) {
+    inline void readTileDataAt(off_t offset, uint8_t * buf, RGBf & fog) {
         if (fseeko(fp, offset, SEEK_SET) < 0)
             return;
 
         readTileData(buf, fog);
     }
 
-    inline size_t writeTileDataAt(off_t offset, const uint8_t * buf, RGB3f fog) {
+    inline size_t writeTileDataAt(off_t offset, const uint8_t * buf, RGBf fog) {
         if (fseeko(fp, offset, SEEK_SET) < 0)
             return 0;
 
